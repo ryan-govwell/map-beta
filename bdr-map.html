@@ -225,7 +225,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="bm-btn"        data-bm="off"   onclick="setBasemap('off')">Off</button>
     </div>
 
-    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">Apr 30, 2026 · 7:33pm</span></div>
+    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 1, 2026 · 6:52pm</span></div>
 
     <div id="searchBox">
       <input id="searchInput" type="text" placeholder="Search accounts…" autocomplete="off" spellcheck="false" />
@@ -354,7 +354,7 @@ let dotFilter    = 'none';
 let activeTier   = 0;
 let currentBasemap = 'dark';
 
-// ── Build BDR pills — restricted to the canonical 10-person roster ───
+// ── Build BDR pills — restricted to the canonical 11-person roster ───
 // Salesforce exports include AEs and other non-BDR owners (Asher Rosenfeld,
 // Jenny Allison, Quinzel Perry, etc.) — we filter those out here so the
 // pill row only shows actual BDRs. Accounts owned by non-roster people
@@ -362,12 +362,16 @@ let currentBasemap = 'dark';
 const BDR_ROSTER = new Set([
   'Catherine Silvestri','Nick Martino','Ali Cohen','Ryan Minter','Alicia Gopal',
   'Lucy Nemerov','Hugh Bargeron','Sydney Ireland','Emily Murnane','Ben Laddis',
+  'Blake Anderson',
 ]);
 (function buildPills(){
   const counts = {};
   ACCOUNTS.forEach(a => { if(a.o) counts[a.o] = (counts[a.o]||0)+1; });
-  const owners = Object.entries(counts)
-    .filter(([name]) => BDR_ROSTER.has(name))   // only canonical BDR roster
+  // Always show every roster member as a pill, even with 0 accounts —
+  // new BDRs (e.g. just-onboarded reps) need a button before any
+  // accounts have been reassigned to them in Salesforce.
+  const owners = Array.from(BDR_ROSTER)
+    .map(name => [name, counts[name] || 0])
     .sort((a,b) => b[1]-a[1])
     .map(([name]) => name);
   const row = document.getElementById('bdrRow');
