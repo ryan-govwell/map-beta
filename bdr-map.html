@@ -168,6 +168,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .tier-btn.t2a{background:#1e3a5f;border-color:#60a5fa;color:#bfdbfe}
 .tier-btn.t3a{background:#3b1764;border-color:#c084fc;color:#e9d5ff}
 .tier-btn.talla{background:#2a2a2a;border-color:#555;color:#fff}
+.tier-btn.tsa{background:#7c2d12;border-color:#fb923c;color:#fed7aa}
 .ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:9px}
 .ph-stat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 3px;text-align:center}
 .ph-sv{font-size:14px;font-weight:800;color:#fff;line-height:1}
@@ -266,7 +267,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="bm-btn"        data-bm="off"   onclick="setBasemap('off')">Off</button>
     </div>
 
-    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 5:22pm</span></div>
+    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 5:38pm</span></div>
 
     <div id="searchBox">
       <input id="searchInput" type="text" placeholder="Search accounts…" autocomplete="off" spellcheck="false" />
@@ -468,8 +469,8 @@ const POP_BUCKETS = [
   { id:'ci-10k',  type:'city',   min:10000,  max:15000     },
   { id:'ci-sm',   type:'city',   min:0,      max:10000     },
 ];
-let popFilter = null; // active bucket id, or null
-let legFilter = null; // active legacy key (lowercase substring), or null
+let popFilters = new Set(); // active bucket ids (multi-select)
+let legFilters = new Set(); // active legacy keys (multi-select)
 
 // Legacy filter key → substring match against account's leg field
 const LEG_KEYS = {
@@ -483,22 +484,21 @@ function getEntityType(name){
 }
 
 function setPopFilter(id){
-  popFilter = (popFilter === id) ? null : id;
+  if(popFilters.has(id)) popFilters.delete(id); else popFilters.add(id);
   document.querySelectorAll('.pop-btn').forEach(b=>{
-    b.classList.toggle('pop-active', b.id === 'pop-'+id && popFilter !== null);
+    b.classList.toggle('pop-active', popFilters.has(b.id.replace('pop-','')));
   });
-  if(popFilter && dotFilter === 'none') setDotFilter('all');
+  if(popFilters.size > 0 && dotFilter === 'none') setDotFilter('all');
   renderDots();
   renderPanel(currentState || null);
 }
 
 function setLegFilter(key){
-  legFilter = (legFilter === key) ? null : key;
+  if(legFilters.has(key)) legFilters.delete(key); else legFilters.add(key);
   document.querySelectorAll('.leg-btn').forEach(b=>{
-    b.classList.toggle('leg-active', b.id === 'leg-'+key && legFilter !== null);
+    b.classList.toggle('leg-active', legFilters.has(b.id.replace('leg-','')));
   });
-  // Legacy filter implies pipeline/customers are relevant — auto-activate pipeline view
-  if(legFilter && dotFilter === 'none') setDotFilter('pipeline');
+  if(legFilters.size > 0 && dotFilter === 'none') setDotFilter('pipeline');
   renderDots();
   renderPanel(currentState || null);
 }
@@ -528,9 +528,9 @@ const map = L.map('map', {
   minZoom: 3,
   maxZoom: 18,
   // Smooth fractional zoom (trackpad pinch / wheel feels continuous)
-  zoomSnap: 0.25,
-  zoomDelta: 0.5,
-  wheelPxPerZoomLevel: 60,        // lower = more responsive trackpad pinch
+  zoomSnap: 0.1,
+  zoomDelta: 0.3,
+  wheelPxPerZoomLevel: 30,        // lower = more responsive trackpad pinch
   wheelDebounceTime: 20,          // faster reaction to wheel gestures
   scrollWheelZoom: true,
   inertia: true,
@@ -679,23 +679,26 @@ const SHAPED = new Set(Object.keys(ICONS));
 
 function filterForView(accts){
   // Empty default — nothing renders until user activates a filter.
-  if(dotFilter==='none' && !popFilter && !legFilter) return [];
+  if(dotFilter==='none' && popFilters.size===0 && legFilters.size===0) return [];
   let out = accts;
-  if(activeTier>0)              out = out.filter(a=>String(a.t)===String(activeTier));
+  if(activeTier==='S')          out = out.filter(a=>a.pop!=null && a.pop>=50000);
+  else if(activeTier>0)         out = out.filter(a=>String(a.t)===String(activeTier));
   if(dotFilter==='customers')   out = out.filter(a=>a.st==='cu');
   else if(dotFilter==='pipeline')   out = out.filter(a=>PIPELINE_FULL.has(a.st));
   else if(dotFilter==='touched')    out = out.filter(a=>TOUCHED_ST.has(a.st));
   else if(dotFilter==='untouched')  out = out.filter(a=>a.st==='u');
-  // Population filter — requires pop field; accounts without pop data are excluded
-  if(popFilter){
-    const bucket = POP_BUCKETS.find(b=>b.id===popFilter);
-    if(bucket) out = out.filter(a=>{
+  // Population filter — OR logic across all selected buckets
+  if(popFilters.size > 0){
+    out = out.filter(a=>{
       if(a.pop==null) return false;
-      return getEntityType(a.a)===bucket.type && a.pop>=bucket.min && a.pop<bucket.max;
+      return Array.from(popFilters).some(id=>{
+        const bucket = POP_BUCKETS.find(b=>b.id===id);
+        return bucket && getEntityType(a.a)===bucket.type && a.pop>=bucket.min && a.pop<bucket.max;
+      });
     });
   }
-  // Legacy software filter — substring match so "tyler" catches all Tyler variants
-  if(legFilter) out = out.filter(a=>(a.leg||'').toLowerCase().includes(legFilter));
+  // Legacy software filter — OR logic across all selected solutions
+  if(legFilters.size > 0) out = out.filter(a=>Array.from(legFilters).some(k=>(a.leg||'').toLowerCase().includes(k)));
   return out;
 }
 
@@ -1069,10 +1072,11 @@ function renderPanel(name){
       <button class="pht-btn${dotFilter==='untouched'?' pu':''}"   onclick="setDotFilter('untouched')">○ Untouched</button>
     </div>
     <div class="tier-toggle">
-      <button class="tier-btn${activeTier===0?' talla':''}" onclick="setTier(0)">All Tiers</button>
-      <button class="tier-btn${activeTier===1?' t1a':''}"   onclick="setTier(1)">T1</button>
-      <button class="tier-btn${activeTier===2?' t2a':''}"   onclick="setTier(2)">T2</button>
-      <button class="tier-btn${activeTier===3?' t3a':''}"   onclick="setTier(3)">T3</button>
+      <button class="tier-btn${activeTier===0?' talla':''}"   onclick="setTier(0)">All Tiers</button>
+      <button class="tier-btn${activeTier===1?' t1a':''}"     onclick="setTier(1)">T1</button>
+      <button class="tier-btn${activeTier===2?' t2a':''}"     onclick="setTier(2)">T2</button>
+      <button class="tier-btn${activeTier===3?' t3a':''}"     onclick="setTier(3)">T3</button>
+      <button class="tier-btn${activeTier==='S'?' tsa':''}"   onclick="setTier('S')" title="Pop 50k+">S</button>
     </div>
     <div class="ph-stats">
       <div class="ph-stat"><div class="ph-sv">${N.toLocaleString()}</div><div class="ph-sl">ICP</div></div>
