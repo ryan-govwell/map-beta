@@ -267,7 +267,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="bm-btn"        data-bm="off"   onclick="setBasemap('off')">Off</button>
     </div>
 
-    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 6:20pm</span></div>
+    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 8:45pm</span></div>
 
     <div id="searchBox">
       <input id="searchInput" type="text" placeholder="Search accounts…" autocomplete="off" spellcheck="false" />
@@ -528,7 +528,7 @@ const map = L.map('map', {
   minZoom: 3,
   maxZoom: 18,
   // Smooth fractional zoom (trackpad pinch / wheel feels continuous)
-  zoomSnap: 0.1,
+  zoomSnap: 0,              // fully continuous zoom — no snapping between levels
   zoomDelta: 1,
   scrollWheelZoom: false,   // disabled — replaced by custom smooth handler below
   inertia: true,
@@ -538,31 +538,48 @@ const map = L.map('map', {
 // Keep +/- buttons visible in bottom-left (basemap toggle is now bottom-left too).
 map.zoomControl.setPosition('bottomleft');
 
-// ── Smooth trackpad zoom (replaces Leaflet's built-in wheel handler) ──────
-// Leaflet's handler fires once per debounce window which feels choppy.
-// This accumulates all wheel events, then drains them frame-by-frame with
-// an easing curve — so one continuous trackpad swipe zooms as far as you push.
+// ── Smooth trackpad zoom ───────────────────────────────────────────
+// Replaces Leaflet's default wheel handler entirely.
+// - goal is tracked independently of map.getZoom() (avoids reading
+//   mid-frame state that hasn't settled yet)
+// - Persistent RAF loop eases toward goal at 30%/frame (smooth decel)
+// - Native addEventListener {passive:false} so preventDefault is respected
+// - goal=null between gestures so cursor anchor resets each time
 (function(){
-  let accum = 0, center = null, raf = null;
-  map.getContainer().addEventListener('wheel', (e) => {
+  var goal = null, anchor = null, endTimer = null;
+
+  map.getContainer().addEventListener('wheel', function(e) {
     e.preventDefault();
-    // Track cursor position so zoom stays anchored to where you're looking
-    const r = map.getContainer().getBoundingClientRect();
-    center = map.containerPointToLatLng(L.point(e.clientX - r.left, e.clientY - r.top));
-    // deltaY: negative = scroll up = zoom in; /100 gives ~5 zoom levels per big swipe
-    accum += -e.deltaY / 100;
-    if (!raf) raf = requestAnimationFrame(step);
+    // Lock cursor position as zoom anchor at start of each gesture
+    var r = map.getContainer().getBoundingClientRect();
+    anchor = map.containerPointToLatLng(L.point(e.clientX - r.left, e.clientY - r.top));
+    // First event of gesture: seed goal from current zoom and clear animations
+    if (goal === null) { goal = map.getZoom(); map._stop(); }
+    // Normalise delta across modes (trackpad=pixels, mouse=lines, keyboard=pages)
+    var raw = e.deltaY;
+    if (e.deltaMode === 1) raw *= 20;
+    if (e.deltaMode === 2) raw *= 400;
+    goal -= raw / 100;   // sensitivity: ~100px raw delta per zoom level; tune here
+    goal = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), goal));
+    // After 200ms of silence, signal Leaflet that the gesture is done (loads tiles)
+    clearTimeout(endTimer);
+    endTimer = setTimeout(function() {
+      try { map._moveEnd(true); } catch(_) {}
+      goal = null;
+    }, 200);
   }, {passive: false});
 
-  function step() {
-    if (Math.abs(accum) < 0.005) { accum = 0; raf = null; return; }
-    const bite = accum * 0.22;   // consume 22% of remaining per frame → smooth ease-out
-    accum -= bite;
-    const z = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + bite));
-    if (center) map.setZoomAround(center, z, {animate: false});
-    else        map.setZoom(z, {animate: false});
-    raf = requestAnimationFrame(step);
-  }
+  // Persistent RAF loop — runs every frame, only acts when a gesture is live
+  requestAnimationFrame(function tick() {
+    if (goal !== null && anchor !== null) {
+      var cur  = map.getZoom();
+      var diff = goal - cur;
+      if (Math.abs(diff) > 0.001) {
+        map.setZoomAround(anchor, cur + diff * 0.3, {animate: false});
+      }
+    }
+    requestAnimationFrame(tick);
+  });
 })();
 
 // ── Basemap tile layers ───────────────────────────────────────────
