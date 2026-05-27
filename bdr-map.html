@@ -110,20 +110,20 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .leg-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .leg-cnt{margin-left:auto;font-size:9px;color:#444;font-weight:600}
 
-/* ── Basemap style toggle ───────────────────────────────── */
-/* Moved to top-right so it doesn't cover Leaflet's +/- zoom controls (bottom-left). */
-#basemapToggle{position:absolute;top:14px;right:14px;display:flex;gap:3px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:3px}
+/* ── Basemap style toggle — bottom-left, beside zoom controls ─────── */
+#basemapToggle{position:absolute;bottom:10px;left:46px;display:flex;gap:3px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:3px}
 
-/* ── Last-refreshed chip (top-right, below basemap toggle) ───────── */
-#refreshedChip{position:absolute;top:46px;right:14px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:4px 10px;font-size:9px;color:#888;letter-spacing:.2px;white-space:nowrap;pointer-events:none}
+/* ── Last-refreshed chip (bottom-left, above basemap toggle) ─────── */
+#refreshedChip{position:absolute;bottom:48px;left:46px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:4px 10px;font-size:9px;color:#888;letter-spacing:.2px;white-space:nowrap;pointer-events:none}
 #refreshedChip .rc-lbl{color:#555;text-transform:uppercase;letter-spacing:.5px;font-size:8px;margin-right:4px}
 #refreshedChip .rc-val{color:#cbd5e1;font-weight:600}
-#searchBox{position:absolute;top:80px;right:14px;z-index:1100;width:240px}
+/* ── Search box — bottom-left, above refreshed chip, dropdown opens upward ── */
+#searchBox{position:absolute;bottom:82px;left:46px;z-index:1100;width:260px}
 #searchInput{width:100%;background:rgba(10,10,10,.95);border:1px solid #333;border-radius:8px;padding:7px 11px 7px 28px;font-size:11px;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color .12s;box-shadow:0 4px 16px rgba(0,0,0,.6)}
 #searchInput::placeholder{color:#555}
 #searchInput:focus{border-color:#60a5fa}
-#searchBox::before{content:"⌕";position:absolute;left:9px;top:5px;color:#555;font-size:14px;pointer-events:none}
-#searchResults{display:none;margin-top:4px;background:rgba(10,10,10,.97);border:1px solid #333;border-radius:8px;overflow:hidden;max-height:340px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.8)}
+#searchBox::before{content:"⌕";position:absolute;left:9px;top:7px;color:#555;font-size:14px;pointer-events:none}
+#searchResults{display:none;position:absolute;bottom:100%;left:0;right:0;margin-bottom:4px;background:rgba(10,10,10,.97);border:1px solid #333;border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;box-shadow:0 -8px 28px rgba(0,0,0,.8)}
 #searchResults.visible{display:block}
 #searchResults::-webkit-scrollbar{width:4px}
 #searchResults::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
@@ -267,7 +267,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="bm-btn"        data-bm="off"   onclick="setBasemap('off')">Off</button>
     </div>
 
-    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 5:38pm</span></div>
+    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">May 27, 2026 · 5:49pm</span></div>
 
     <div id="searchBox">
       <input id="searchInput" type="text" placeholder="Search accounts…" autocomplete="off" spellcheck="false" />
@@ -529,9 +529,9 @@ const map = L.map('map', {
   maxZoom: 18,
   // Smooth fractional zoom (trackpad pinch / wheel feels continuous)
   zoomSnap: 0.1,
-  zoomDelta: 0.3,
-  wheelPxPerZoomLevel: 30,        // lower = more responsive trackpad pinch
-  wheelDebounceTime: 20,          // faster reaction to wheel gestures
+  zoomDelta: 0.5,
+  wheelPxPerZoomLevel: 120,       // higher = gentler per-pixel zoom (smoother trackpad feel)
+  wheelDebounceTime: 40,          // Leaflet default — less jitter accumulation
   scrollWheelZoom: true,
   inertia: true,
   zoomAnimation: true,
