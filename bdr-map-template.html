@@ -215,8 +215,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="dataDate" class="date-chip"></div>
   </div>
   <div class="bdr-row" id="bdrRow">
-    <span class="pill-lbl">BDR</span>
-    <!-- Pills rendered dynamically from data -->
+    <span class="pill-lbl"></span>
+    <!-- Pills rendered dynamically from data + view config -->
   </div>
 </div>
 
@@ -227,11 +227,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <button id="backBtn" onclick="resetView()">← US</button>
 
     <div id="dotToggle">
-      <button class="dt-btn" id="dt-all"        onclick="setDotFilter('all')">All</button>
-      <button class="dt-btn"            id="dt-customers"  onclick="setDotFilter('customers')">★ Customers</button>
-      <button class="dt-btn"            id="dt-pipeline"   onclick="setDotFilter('pipeline')">◆ Pipeline</button>
-      <button class="dt-btn"            id="dt-touched"    onclick="setDotFilter('touched')"   onmouseenter="showFilterTip(event,'touched')"   onmouseleave="hideFilterTip()">● Touched</button>
-      <button class="dt-btn"            id="dt-untouched"  onclick="setDotFilter('untouched')" onmouseenter="showFilterTip(event,'untouched')" onmouseleave="hideFilterTip()">○ Untouched</button>
+      <!-- Filter buttons built dynamically from view config -->
     </div>
 
     <div id="popToggle">
@@ -315,33 +311,21 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 // WEEKLY DATA — replace ACCOUNTS every Monday
 // ═══════════════════════════════════════════════════════════════════
 const DATA_VERSION = "%%DATA_VERSION%%";
-const ACCOUNTS = %%ACCOUNTS_JSON%%;
+let ACCOUNTS = [];   // populated at runtime via fetch('accounts_data.json')
 // ═══════════════════════════════════════════════════════════════════
 // END WEEKLY DATA
 // ═══════════════════════════════════════════════════════════════════
 
-// ── Visual config ─────────────────────────────────────────────────
-const STATUS_COLORS = {
-  cu:'#fbbf24', vb:'#22c55e', pr:'#f97316', dm:'#c084fc',
-  sq:'#00e5ff', mb:'#3b82f6', ii:'#fde047', cl:'#ef4444',
-  t :'#38bdf8', u :'#cbd5e1',
-};
-const STATUS_LABELS = {
-  cu:'Customer', vb:'Verbal', pr:'Proposal', dm:'Demo',
-  sq:'Sales Qualified', mb:'Meeting Booked', ii:'Initial Interest',
-  cl:'Closed Lost', t:'Touched', u:'Untouched',
-};
-const STATUS_ORDER  = ['cu','vb','pr','dm','sq','mb','ii','cl','t','u'];
-const PIPELINE_ST   = new Set(['vb','pr','dm','sq','mb','ii']);
-const TOUCHED_ST    = new Set(['vb','pr','dm','sq','mb','ii','cl','cu','t']);
-const PIPELINE_FULL = new Set(['ii','mb','sq','dm','pr','vb','cu']);
-
-const SYM_TYPE = {
-  cu:d3.symbolStar, vb:d3.symbolDiamond2, pr:d3.symbolTriangle,
-  dm:d3.symbolSquare, sq:d3.symbolAsterisk,
-  mb:d3.symbolWye, ii:d3.symbolCross, cl:d3.symbolCircle,
-  t:d3.symbolCircle, u:d3.symbolCircle,
-};
+// ── Visual config — populated at runtime from view-config-bdr.json ─
+let STATUS_COLORS    = {};
+let STATUS_LABELS    = {};
+let STATUS_ORDER     = [];
+let PIPELINE_ST      = new Set();
+let TOUCHED_ST       = new Set();
+let PIPELINE_FULL    = new Set();
+let SYM_TYPE         = {};
+let OWNER_ROSTER     = new Set();
+let VIEW_OWNER_LABEL = 'Owner';
 const DOT_R = 7.5;
 const CUST_R = 11;
 
@@ -371,22 +355,24 @@ const FIPS = {
   "53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
 };
 
-// ── Pre-compute per-state stats ───────────────────────────────────
+// ── Per-state stats — populated after accounts_data.json loads ────
 const byState = {};
-ACCOUNTS.forEach(a => {
-  if(!a.s||!ABBR[a.s]) return;
-  if(!byState[a.s]) byState[a.s]={
-    total:0,touched:0,pipeline:0,customers:0,untouched:0,
-    vb:0,pr:0,dm:0,sq:0,mb:0,ii:0,cl:0,custArr:0,
-  };
-  const s=byState[a.s];
-  const tch = TOUCHED_ST.has(a.st);
-  s.total++;
-  if(tch) s.touched++; else s.untouched++;
-  if(PIPELINE_ST.has(a.st)) s.pipeline++;
-  if(a.st==='cu'){ s.customers++; s.custArr+=(a.arr||0); }
-  if(s[a.st]!==undefined) s[a.st]++;
-});
+function _computeByState(){
+  ACCOUNTS.forEach(a => {
+    if(!a.s||!ABBR[a.s]) return;
+    if(!byState[a.s]) byState[a.s]={
+      total:0,touched:0,pipeline:0,customers:0,untouched:0,
+      vb:0,pr:0,dm:0,sq:0,mb:0,ii:0,cl:0,custArr:0,
+    };
+    const s=byState[a.s];
+    const tch = TOUCHED_ST.has(a.st);
+    s.total++;
+    if(tch) s.touched++; else s.untouched++;
+    if(PIPELINE_ST.has(a.st)) s.pipeline++;
+    if(a.st==='cu'){ s.customers++; s.custArr+=(a.arr||0); }
+    if(s[a.st]!==undefined) s[a.st]++;
+  });
+}
 
 // ── App state ─────────────────────────────────────────────────────
 let activeBdr    = '';
@@ -396,23 +382,16 @@ let dotFilter    = 'none';
 let activeTier   = 0;
 let currentBasemap = 'dark';
 
-// ── Build BDR pills — restricted to the canonical 12-person roster ───
-// Salesforce exports include AEs and other non-BDR owners (Asher Rosenfeld,
-// Jenny Allison, Quinzel Perry, etc.) — we filter those out here so the
-// pill row only shows actual BDRs. Accounts owned by non-roster people
-// still appear on the map; they just don't get a pill of their own.
-const BDR_ROSTER = new Set([
-  'Catherine Silvestri','Nick Martino','Ali Cohen','Ryan Minter','Alicia Gopal',
-  'Lucy Nemerov','Hugh Bargeron','Sydney Ireland','Emily Murnane','Ben Laddis',
-  'Blake Anderson','Mihir Shah','Maia Golub',
-]);
-(function buildPills(){
+// ── Owner pills — roster populated from view config ───────────────
+// Salesforce exports include AEs and other non-roster owners — filter so the
+// pill row only shows the current team. Non-roster accounts still appear on
+// the map; they just don't get a pill.
+function buildPills(){
   const counts = {};
   ACCOUNTS.forEach(a => { if(a.o) counts[a.o] = (counts[a.o]||0)+1; });
   // Always show every roster member as a pill, even with 0 accounts —
-  // new BDRs (e.g. just-onboarded reps) need a button before any
-  // accounts have been reassigned to them in Salesforce.
-  const owners = Array.from(BDR_ROSTER)
+  // new reps need a button before any accounts have been reassigned to them.
+  const owners = Array.from(OWNER_ROSTER)
     .map(name => [name, counts[name] || 0])
     .sort((a,b) => b[1]-a[1])
     .map(([name]) => name);
@@ -454,7 +433,51 @@ const BDR_ROSTER = new Set([
       renderPanel(currentState || null);
     })
   );
-})();
+}
+
+// ── View config loader ────────────────────────────────────────────
+const _D3_SYMBOLS = {
+  star:d3.symbolStar, diamond2:d3.symbolDiamond2, triangle:d3.symbolTriangle,
+  square:d3.symbolSquare, asterisk:d3.symbolAsterisk,
+  wye:d3.symbolWye, cross:d3.symbolCross, circle:d3.symbolCircle,
+};
+function _applyViewConfig(cfg){
+  const codes = Object.keys(cfg.statuses);
+  STATUS_COLORS = {}; STATUS_LABELS = {}; SYM_TYPE = {};
+  codes.forEach(c => {
+    STATUS_COLORS[c] = cfg.statuses[c].color;
+    STATUS_LABELS[c] = cfg.statuses[c].label;
+    SYM_TYPE[c]      = _D3_SYMBOLS[cfg.statuses[c].symbol] || d3.symbolCircle;
+  });
+  // Sort by priority descending: highest-priority (cu) first in array.
+  // renderDots uses STATUS_ORDER.indexOf() to sort markers — higher index =
+  // lower priority = rendered first (underneath).
+  STATUS_ORDER  = [...codes].sort((a,b) => cfg.statuses[b].priority - cfg.statuses[a].priority);
+  PIPELINE_ST   = new Set(cfg.statusGroups.pipeline);
+  TOUCHED_ST    = new Set(cfg.statusGroups.touched);
+  PIPELINE_FULL = new Set(cfg.statusGroups.pipelineFull);
+  OWNER_ROSTER  = new Set(cfg.roster);
+  VIEW_OWNER_LABEL = cfg.ownerLabel || 'Owner';
+  const pillLbl = document.querySelector('.pill-lbl');
+  if(pillLbl) pillLbl.textContent = cfg.ownerLabel;
+  _buildDotFilterButtons(cfg.dotFilters);
+}
+function _buildDotFilterButtons(filters){
+  const bar = document.getElementById('dotToggle');
+  bar.innerHTML = '';
+  filters.forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'dt-btn';
+    b.id = 'dt-' + f.id;
+    b.textContent = f.label;
+    b.onclick = () => setDotFilter(f.id);
+    if(f.showTip){
+      b.addEventListener('mouseenter', e => showFilterTip(e, f.id));
+      b.addEventListener('mouseleave', hideFilterTip);
+    }
+    bar.appendChild(b);
+  });
+}
 
 // ── Population filter ─────────────────────────────────────────────
 const POP_BUCKETS = [
@@ -778,7 +801,7 @@ function tipHtml(d){
     </div>
     <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
     ${stateRow}${popRow}${ageRow}${touchRow}${legRow}${extra}
-    <div class="tt-row"><span>Owner</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    <div class="tt-row"><span>${VIEW_OWNER_LABEL}</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
     <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
   `;
 }
@@ -867,7 +890,7 @@ function showDotTip(ev,d){
     </div>
     <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
     ${popRow2}${ageRow}${touchRow}${legRow}${extra}
-    <div class="tt-row"><span>Owner</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    <div class="tt-row"><span>${VIEW_OWNER_LABEL}</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
     <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
   `;
   tipEl.style.display='block'; moveTip(ev,tipEl);
@@ -1013,12 +1036,11 @@ function renderPanel(name){
   }
 
   function pipelineSection(){
-    const stages=['vb','pr','dm','sq','mb','ii'];
-    const sNames={vb:'Verbal',pr:'Proposal',dm:'Demo',sq:'Sales Qualified',mb:'Meeting Booked',ii:'Initial Interest'};
+    const stages=STATUS_ORDER.filter(st=>PIPELINE_ST.has(st));
     const rows=stages.map(st=>{
       const cnt=scopeAll.filter(a=>a.st===st).length;
       return cnt?`<div class="pr">
-        <div class="pr-lbl">${iconSvg(st,8)} ${sNames[st]}</div>
+        <div class="pr-lbl">${iconSvg(st,8)} ${STATUS_LABELS[st]}</div>
         <div class="pr-val" style="color:${STATUS_COLORS[st]}">${cnt}</div>
       </div>`:'';
     }).join('');
@@ -1132,19 +1154,13 @@ function renderPanel(name){
 
 // ── Legend ────────────────────────────────────────────────────────
 function buildLegend(){
-  const rows=[
-    {st:'cu',label:'Customer'},{st:'vb',label:'Verbal'},{st:'pr',label:'Proposal'},
-    {st:'dm',label:'Demo'},{st:'sq',label:'Sales Qualified'},{st:'mb',label:'Meeting Booked'},
-    {st:'ii',label:'Initial Interest'},{st:'cl',label:'Closed Lost'},
-    {st:'t',label:'Touched'},{st:'u',label:'Untouched'},
-  ];
   document.getElementById('legend').innerHTML=
     `<div class="leg-title">Account Status</div>`+
-    rows.map(r=>{
-      const cnt=ACCOUNTS.filter(a=>a.st===r.st).length;
+    STATUS_ORDER.map(st=>{
+      const cnt=ACCOUNTS.filter(a=>a.st===st).length;
       return `<div class="leg-row">
-        <span class="leg-icon">${iconSvg(r.st,8)}</span>
-        <span>${r.label}</span>
+        <span class="leg-icon">${iconSvg(st,8)}</span>
+        <span>${STATUS_LABELS[st]}</span>
         <span class="leg-cnt">${cnt.toLocaleString()}</span>
       </div>`;
     }).join('');
@@ -1334,20 +1350,33 @@ map.on('contextmenu', (e) => {
   if(e.originalEvent) e.originalEvent.preventDefault();
 });
 
-// ── First paint: draw dots & legend immediately so the map is never empty ──
-// We do this BEFORE the state-boundaries fetch resolves, because the fetch
-// can stall or fail on restrictive networks — and the dots should show
-// regardless of whether state outlines load.
+// ── Initialize map and static UI ─────────────────────────────────
 map.fitBounds([[24.5,-125],[49.5,-66]], { padding:[20,20] });
 buildLegend();
-document.getElementById('dataDate').textContent = DATA_VERSION + ' · ' + ACCOUNTS.length.toLocaleString() + ' accounts';
-try {
-  renderDots();
-  renderPanel(null);   // national summary immediately on load
-  console.log('[bdr-map] initial renderDots OK — total accounts:', ACCOUNTS.length);
-} catch(err){
-  console.error('[bdr-map] renderDots threw:', err);
-}
+document.getElementById('dataDate').textContent = 'Loading…';
+
+// ── Load view config + account data in parallel, then first paint ─
+Promise.all([
+  fetch('view-config-bdr.json').then(r => { if(!r.ok) throw new Error('config HTTP '+r.status); return r.json(); }),
+  fetch('accounts_data.json')  .then(r => { if(!r.ok) throw new Error('data HTTP '+r.status);   return r.json(); }),
+]).then(([cfg, data]) => {
+  _applyViewConfig(cfg);
+  ACCOUNTS = data;
+  _computeByState();
+  updateChoro();        // re-style states if boundaries already loaded
+  buildPills();
+  document.getElementById('dataDate').textContent = DATA_VERSION + ' · ' + data.length.toLocaleString() + ' accounts';
+  try {
+    renderDots();
+    renderPanel(null);
+    console.log('[bdr-map] initial renderDots OK — total accounts:', ACCOUNTS.length);
+  } catch(err){
+    console.error('[bdr-map] renderDots threw:', err);
+  }
+}).catch(err => {
+  console.error('[bdr-map] Failed to load:', err);
+  document.getElementById('dataDate').textContent = 'Error loading data';
+});
 
 // ── Render state boundaries (non-blocking) ───────────────────────
 fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')

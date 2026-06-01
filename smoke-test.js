@@ -48,7 +48,8 @@ check('topojson JS script',         () => !!document.querySelector('script[src*=
 
 // ── JS content spot-checks ───────────────────────────────────
 const scriptBlocks = [...document.querySelectorAll('script')].map(s => s.textContent || '').join('\n');
-check('ACCOUNTS data injected',     () => scriptBlocks.includes('const ACCOUNTS = [{'), () => `len ≈ ${scriptBlocks.length.toLocaleString()}`);
+check('ACCOUNTS loaded via fetch',   () => scriptBlocks.includes("fetch('accounts_data.json')"), () => `len ≈ ${scriptBlocks.length.toLocaleString()}`);
+check('view config loaded via fetch',() => scriptBlocks.includes("fetch('view-config-bdr.json')"));
 check('DATA_VERSION substituted',   () => !scriptBlocks.includes('%%DATA_VERSION%%'));
 check('DATA_REFRESHED substituted', () => !html.includes('%%DATA_REFRESHED%%'));
 check('state-click fallback wired', () => scriptBlocks.includes('d3.geoContains'));
@@ -67,7 +68,7 @@ check('search JS wired',            () => scriptBlocks.includes('setupSearch') &
 check('empty-default filter',       () => scriptBlocks.includes("dotFilter    = 'none'") || scriptBlocks.includes("dotFilter = 'none'"));
 
 // Parse the inline JS with Node — catches syntax errors.
-const inlineScript = [...document.querySelectorAll('script')].map(s => s.textContent).find(t => t && t.includes('const ACCOUNTS'));
+const inlineScript = [...document.querySelectorAll('script')].map(s => s.textContent).find(t => t && t.includes('let ACCOUNTS'));
 try {
   new (require('vm').Script)(inlineScript);
   checks.push(['Inline JS parses', 'PASS', '']);

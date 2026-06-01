@@ -2,19 +2,21 @@
 """
 build-map.py — GovWell Territory Dashboard assembler.
 
-Takes the template + a processed accounts JSON and writes the final bdr-map.html
-with all three placeholders substituted. Uses paths relative to this script so
-it works from any session without path fixups.
+Takes the template and writes the final bdr-map.html with two placeholders
+substituted. accounts_data.json is served as a standalone file at runtime
+via fetch() — it is NOT injected into the HTML. Use paths relative to this
+script so it works from any session without path fixups.
 
 Inputs  (must exist in the same folder as this script):
-  - bdr-map-template.html   The template with %%ACCOUNTS_JSON%%,
-                            %%DATA_VERSION%%, %%DATA_REFRESHED%% placeholders.
-  - accounts_data.json      Compact account list produced by data_processor.py.
+  - bdr-map-template.html   The template with %%DATA_VERSION%% and
+                            %%DATA_REFRESHED%% placeholders.
+  - accounts_data.json      Validated by this script (not injected).
+                            Must be deployed alongside bdr-map.html.
   - All Data for Map/       Folder; most recent ICP export's stem-suffix is used
                             as the data version string.
 
 Output:
-  - bdr-map.html            Ready to push to GitHub.
+  - bdr-map.html            Ready to push to GitHub (alongside accounts_data.json).
 
 Usage:
   python3 build-map.py
@@ -35,11 +37,10 @@ if not JSON_PATH.exists():
              f'   Run data_processor.py first to generate accounts_data.json.')
 
 templ = TEMPL_PATH.read_text()
-accts = JSON_PATH.read_text().strip()
 
-# Validate JSON before injecting (catches truncated or corrupt files).
+# Validate accounts_data.json (not injected — served as a standalone file).
 try:
-    parsed = json.loads(accts)
+    parsed = json.loads(JSON_PATH.read_text())
     if not isinstance(parsed, list) or len(parsed) < 100:
         sys.exit(f'❌ accounts_data.json looks wrong ({len(parsed)} items). Expected >10k.')
 except Exception as e:
@@ -59,15 +60,13 @@ h = now.hour % 12 or 12
 ampm = 'am' if now.hour < 12 else 'pm'
 refreshed = now.strftime('%b ') + str(now.day) + now.strftime(', %Y') + f' · {h}:{now.minute:02d}{ampm}'
 
-# Assemble: three template placeholders, string-replace (NOT regex — the JSON
-# contains characters that would be interpreted as regex metacharacters).
+# Assemble: substitute the two remaining placeholders.
 out = (templ
-       .replace('%%ACCOUNTS_JSON%%', accts)
        .replace('%%DATA_VERSION%%',  ver)
        .replace('%%DATA_REFRESHED%%', refreshed))
 
 # Sanity: no placeholders should remain.
-for ph in ('%%ACCOUNTS_JSON%%', '%%DATA_VERSION%%', '%%DATA_REFRESHED%%'):
+for ph in ('%%DATA_VERSION%%', '%%DATA_REFRESHED%%', '%%ACCOUNTS_JSON%%'):
     if ph in out:
         sys.exit(f'❌ Placeholder {ph} was not substituted — template mismatch.')
 

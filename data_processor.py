@@ -77,7 +77,16 @@ def load_icp(path):
     # use raw column indices: 1=state, 2=tier, 4=account name, 6=created, 7=owner
     df = raw.iloc[header_row+1:].copy()
     df.columns = list(range(raw.shape[1]))
-    df = df.rename(columns={1:"state",2:"tier",4:"account",6:"created",7:"owner"})
+    rename_map = {1:"state", 2:"tier", 4:"account", 6:"created", 7:"owner"}
+    # detect Account ID column (e.g. "Account ID", "18 Digit Account ID") — not yet in current exports
+    hdr = raw.iloc[header_row].astype(str).tolist()
+    id_col = next((j for j, v in enumerate(hdr) if "account id (18)" in v.lower()), None)
+    if id_col is not None:
+        rename_map[id_col] = "sf_id"
+        print(f"  ICP: found Account ID (18) column at col {id_col} ({hdr[id_col]!r})")
+    else:
+        print("  ICP: no 'Account ID (18)' column — 'id' field will be omitted from output")
+    df = df.rename(columns=rename_map)
     # ffill state and tier (grouped rows)
     df["state"] = df["state"].ffill()
     df["tier"]  = df["tier"].ffill()
@@ -95,6 +104,8 @@ def load_icp(path):
     df["account"] = df["account"].astype(str).str.strip()
     df["state"] = df["state"].astype(str).str.strip()
     df["owner"] = df["owner"].astype(str).str.strip()
+    if "sf_id" not in df.columns:
+        df["sf_id"] = None
     return df.reset_index(drop=True)
 
 icp = load_icp(ICP_FILE)
@@ -292,6 +303,7 @@ for _, row in icp.iterrows():
     tier = row["tier"]
     owner = row["owner"]
     created = str(row.get("created","") or "")
+    sf_id = str(row.get("sf_id","") or "").strip()
     # determine status
     code = "u"
     legacy = None
@@ -321,7 +333,9 @@ for _, row in icp.iterrows():
         if code == "u":
             code = "t"
     # build account dict
-    o = {"a": name, "s": state, "t": str(tier), "o": owner, "st": code}
+    o = {"a": name, "s": state, "t": str(tier), "o": owner, "st": code, "src": "bdr"}
+    if sf_id and sf_id.lower() not in ("nan", "none", ""):
+        o["id"] = sf_id
     coords = lookup_coords(name, state)
     if coords:
         la, lo = coords

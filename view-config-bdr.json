@@ -1,0 +1,33 @@
+{
+  "viewId": "bdr",
+  "ownerLabel": "BDR",
+  "statuses": {
+    "cu": { "label": "Customer",         "color": "#fbbf24", "symbol": "star",     "priority": 10 },
+    "vb": { "label": "Verbal",           "color": "#22c55e", "symbol": "diamond2", "priority": 9  },
+    "pr": { "label": "Proposal",         "color": "#f97316", "symbol": "triangle", "priority": 8  },
+    "dm": { "label": "Demo",             "color": "#c084fc", "symbol": "square",   "priority": 7  },
+    "sq": { "label": "Sales Qualified",  "color": "#00e5ff", "symbol": "asterisk", "priority": 6  },
+    "mb": { "label": "Meeting Booked",   "color": "#3b82f6", "symbol": "wye",      "priority": 5  },
+    "ii": { "label": "Initial Interest", "color": "#fde047", "symbol": "cross",    "priority": 4  },
+    "cl": { "label": "Closed Lost",      "color": "#ef4444", "symbol": "circle",   "priority": 3  },
+    "t":  { "label": "Touched",          "color": "#38bdf8", "symbol": "circle",   "priority": 2  },
+    "u":  { "label": "Untouched",        "color": "#cbd5e1", "symbol": "circle",   "priority": 1  }
+  },
+  "statusGroups": {
+    "pipeline":     ["vb", "pr", "dm", "sq", "mb", "ii"],
+    "touched":      ["vb", "pr", "dm", "sq", "mb", "ii", "cl", "cu", "t"],
+    "pipelineFull": ["ii", "mb", "sq", "dm", "pr", "vb", "cu"]
+  },
+  "dotFilters": [
+    { "id": "all",       "label": "All"          },
+    { "id": "customers", "label": "★ Customers"  },
+    { "id": "pipeline",  "label": "◆ Pipeline"   },
+    { "id": "touched",   "label": "● Touched",   "showTip": true },
+    { "id": "untouched", "label": "○ Untouched", "showTip": true }
+  ],
+  "roster": [
+    "Catherine Silvestri", "Nick Martino", "Ali Cohen", "Ryan Minter",
+    "Alicia Gopal", "Lucy Nemerov", "Hugh Bargeron", "Sydney Ireland",
+    "Emily Murnane", "Ben Laddis", "Blake Anderson", "Mihir Shah", "Maia Golub"
+  ]
+}
