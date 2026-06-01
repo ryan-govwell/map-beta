@@ -192,37 +192,25 @@ touched_accts = set(act_latest["account"].astype(str))
 latest_month_by_acct = dict(zip(act_latest["account"], act_latest["month"]))
 print(f"Distinct touched accounts (any time): {len(touched_accts)}")
 
-# ---------------- Step 6: Carryover geocoords from prev bdr-map.html ----------------
-def load_prev_coords(html_path):
-    if not os.path.exists(html_path):
-        print("No previous bdr-map.html — all coords will be random")
-        return {}
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
-    # ACCOUNTS array is JSON-like compact: [{"a":"...","s":"...",...},{...}]
-    m = re.search(r"const\s+ACCOUNTS\s*=\s*(\[.*?\]);", html, re.DOTALL)
-    if not m:
-        # try without semicolon, or different var name
-        m = re.search(r"window\.ACCOUNTS\s*=\s*(\[.*?\]);", html, re.DOTALL)
-    if not m:
-        # try the raw JSON injected at %%ACCOUNTS_JSON%%
-        m = re.search(r"const\s+ACCOUNTS\s*=\s*(\[\{.*?\}\]);", html, re.DOTALL)
-    if not m:
-        print("Could not regex-extract ACCOUNTS array")
+# ---------------- Step 6: Carryover geocoords from accounts_data.json ----------------
+def load_prev_coords(json_path):
+    if not os.path.exists(json_path):
+        print("No previous accounts_data.json — all coords will be random")
         return {}
     try:
-        arr = json.loads(m.group(1))
+        with open(json_path, "r", encoding="utf-8") as f:
+            arr = json.load(f)
     except Exception as e:
-        print(f"JSON parse failed on prev ACCOUNTS: {e}")
+        print(f"Could not load previous accounts_data.json: {e}")
         return {}
     coords = {}
     for a in arr:
-        name = a.get("a","").strip()
+        name = a.get("a", "").strip()
         if name and "la" in a and "lo" in a:
-            coords[name] = (a["la"], a["lo"], a.get("s",""))
+            coords[name] = (a["la"], a["lo"], a.get("s", ""))
     return coords
 
-prev_coords = load_prev_coords(HTML_SRC)
+prev_coords = load_prev_coords(OUT_JSON)
 print(f"\nPrev coords loaded: {len(prev_coords)}")
 
 # fuzzy-match helpers
