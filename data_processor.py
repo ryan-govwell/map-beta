@@ -79,13 +79,18 @@ def load_icp(path):
     df = raw.iloc[header_row+1:].copy()
     df.columns = list(range(raw.shape[1]))
     rename_map = {1:"state", 2:"tier", 4:"account", 6:"created", 7:"owner"}
-    # detect Account ID column (e.g. "Account ID", "18 Digit Account ID") — not yet in current exports
     hdr = raw.iloc[header_row].astype(str).tolist()
-    id_col = next((j for j, v in enumerate(hdr) if "account id (18)" in v.lower()), None)
-    if id_col is not None:
-        rename_map[id_col] = "sf_id"
-        print(f"  ICP: found Account ID (18) column at col {id_col} ({hdr[id_col]!r})")
-    else:
+    # auto-detect optional columns by header name
+    for j, v in enumerate(hdr):
+        vl = v.lower()
+        if "account id (18)" in vl:
+            rename_map[j] = "sf_id"
+            print(f"  ICP: found Account ID (18) column at col {j} ({hdr[j]!r})")
+        elif "population" in vl:
+            rename_map[j] = "pop"
+        elif "legacy" in vl:
+            rename_map[j] = "icp_leg"
+    if "sf_id" not in rename_map.values():
         print("  ICP: no 'Account ID (18)' column — 'id' field will be omitted from output")
     df = df.rename(columns=rename_map)
     # ffill state and tier (grouped rows)
@@ -300,8 +305,9 @@ for _, row in icp.iterrows():
     sf_id = str(row.get("sf_id","") or "").strip()
     # determine status
     code = "u"
-    legacy = None
+    legacy = str(row.get("icp_leg","") or "").strip() or None
     arr_val = None
+    pop_val = row.get("pop")
     # 1) customer
     if name in cust_by_acct:
         code = "cu"
@@ -345,6 +351,11 @@ for _, row in icp.iterrows():
             random_count += 1
     o["la"] = round(la, 4)
     o["lo"] = round(lo, 4)
+    if pop_val is not None and not (isinstance(pop_val, float) and pd.isna(pop_val)):
+        try:
+            o["pop"] = int(float(pop_val))
+        except (ValueError, TypeError):
+            pass
     if legacy and str(legacy) != "nan":
         o["leg"] = str(legacy)
     if arr_val and not pd.isna(arr_val):
