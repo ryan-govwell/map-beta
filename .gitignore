@@ -1,5 +1,8 @@
 # Salesforce exports (replaced weekly, not tracked in git)
 All Data for Map/
 
+# Intermediate Salesforce MCP output (may contain full ARR, IDs, etc.)
+sfdc_raw.json
+
 # macOS
 .DS_Store

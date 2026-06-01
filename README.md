@@ -1,9 +1,11 @@
 # GovWell Territory Dashboard
 
-An interactive map showing GovWell's ~17,500 ICP accounts across all 50 states — color-coded by pipeline status, filterable by BDR, tier, and account type. Used by the BDR team to track territory coverage and prioritize outreach.
+An interactive map showing GovWell's ~17,500 ICP accounts across all 50 states — color-coded by pipeline status, filterable by BDR, tier, account type, population, and legacy software. Used by the BDR team to track territory coverage and prioritize outreach.
 
-**Live map:** https://acohengw.github.io/govwell-state-of-territory/bdr-map.html
+**Live map:** https://map.bd-at-govwell.com/bdr-map.html
 **Password:** `Permitplease`
+
+> This repo is **private**. Collaborators must be invited at `github.com/acohenGW/govwell-state-of-territory/settings/access`.
 
 ---
 
@@ -22,7 +24,7 @@ This project is designed to be worked on with Claude Code. When you open this re
 
 ### Things you can ask Claude to do
 
-- *"Run the weekly data refresh with these new Salesforce exports"*
+- *"Refresh the data from Salesforce"*
 - *"Add [Name] to the BDR roster"*
 - *"Change the color for Verbal from green to teal"*
 - *"Build and push the updated map to GitHub"*
@@ -37,7 +39,8 @@ This project is designed to be worked on with Claude Code. When you open this re
 | `CLAUDE.md` | Full project documentation — start here |
 | `bdr-map-template.html` | The map UI — edit this, never `bdr-map.html` directly |
 | `view-config-bdr.json` | BDR-specific config: status colors, roster, filter buttons |
-| `data_processor.py` | Reads 5 Salesforce exports → `accounts_data.json` |
+| `sfdc-query-bdr.json` | Salesforce SOQL queries + field mappings for BDR refresh |
+| `data_processor.py` | Reads Salesforce data or Excel exports → `accounts_data.json` |
 | `build-map.py` | Stamps version + timestamp into template → `bdr-map.html` |
 | `accounts_data.json` | The ~17,500 account records loaded by the map at runtime |
 | `smoke-test.js` | Automated checks to confirm nothing broke after a build |
@@ -45,23 +48,23 @@ This project is designed to be worked on with Claude Code. When you open this re
 
 ## Weekly refresh (high level)
 
-1. Download 5 Salesforce exports into `All Data for Map/`
-2. Ask Claude to run `data_processor.py`
-3. Ask Claude to run `build-map.py`
-4. Ask Claude to run the smoke tests
-5. Ask Claude to push to GitHub
+**With Salesforce MCP (Phase 2 — coming soon):**
+1. Tell Claude: *"Refresh the data from Salesforce"*
+2. Claude runs the SOQL queries, processes the data, rebuilds the map, and pushes to GitHub
 
-The full workflow with exact details is in `CLAUDE.md`.
+**With manual Excel exports (current):**
+1. Download 5 Salesforce exports into `All Data for Map/`
+2. Ask Claude to run `data_processor.py`, then `build-map.py`, then push
 
 ---
 
 ## What's planned next
 
-- **Phase 2** — Replace manual CSV exports with a direct Salesforce connection
-- **Phase 3** — Add an AE pipeline layer to the same map
+- **Phase 2** *(in progress)* — Direct Salesforce MCP integration replaces manual CSV exports
+- **Phase 3** — Add an AE pipeline layer with its own view config and Salesforce queries
 - **Phase 4** — Full GTM view: BDR + AE + CS + Marketing on one map engine
 
-See `CLAUDE.md` for the complete phase roadmap.
+See `CLAUDE.md` for the complete phase roadmap and technical details.
 
 ---
 

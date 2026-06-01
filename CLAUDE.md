@@ -16,31 +16,24 @@ Ali is non-technical. When working in this project:
 
 ---
 
-## Public Repo Data Policy
+## Repository & Data Policy
 
-This repo is **public on GitHub**. The following rules apply to everything committed here — code, config, and data files:
+This repo is **private on GitHub** (GitHub Pro). The privacy boundary is the repo itself — collaborators must be explicitly invited.
 
 ### Never commit
-- ARR, deal size, or any revenue/financial figures
-- Salesforce record IDs (Account ID, Opportunity ID, etc.)
 - API keys, tokens, passwords, or credentials of any kind
-- Raw Salesforce export files (`.xlsx`) — these go in `All Data for Map/` which is gitignored
+- Raw Salesforce export files (`.xlsx`) — gitignored, go in `All Data for Map/`
+- `sfdc_raw.json` — gitignored, intermediate Salesforce query output (may contain full ARR, IDs, etc.)
 
 ### Safe to commit
-- Account names and states (government entities, publicly known)
-- Pipeline status codes (`cu`, `sq`, `mb`, etc.) — needed for map functionality
-- BDR owner names — already public in `view-config-bdr.json`
-- Legacy software names — needed for legacy filter
-- Population, tier, coordinates, and other non-financial fields
+All processed account data fields are safe to commit since the repo is private:
+- `arr` (customer ARR), `id` (Salesforce Account ID), pipeline status, owner names, legacy software, population, coordinates — everything the map needs
 
-### How this applies to future phases
+### Salesforce MCP rule — CRITICAL
+**Claude must never query Salesforce unless Ali explicitly asks for a data refresh.** The MCP tools exist in every session but must remain dormant. Querying Salesforce costs tokens and hits the live org. Only invoke `mcp__claude_ai_Salesforce_MCP_Read_Only__*` tools when Ali says something like "refresh the data from Salesforce" or "run the Salesforce refresh."
 
-**Phase 2 (Salesforce MCP):** When we add direct Salesforce querying, any fields containing financial data (ARR, ACV, deal value) must NOT be written to `accounts_data.json`. If the map ever needs to show ARR in the future, that data must come from an authenticated endpoint — not a file in this repo.
-
-**Phase 3/4 (AE, CS layers):** Same rule applies to all view-config and data files for other teams. Revenue and ID fields stay out of committed files.
-
-### Why `arr` and `id` were removed
-In June 2026, `arr` (customer ARR) and `id` (Salesforce Account ID) were removed from `accounts_data.json` to make the repo safely public. The map continues to function fully — ARR just no longer appears in tooltips or state panels.
+### Multi-team data policy (Phase 3/4)
+When AE, CS, or other teams get their own views, each team's data file (`accounts_data_ae.json`, etc.) follows the same rule: safe to commit since the repo is private. Each team gets its own query config (`sfdc-query-ae.json`, etc.) — no changes to the map engine or shared infrastructure.
 
 ---
 
@@ -275,10 +268,31 @@ This project is being migrated from Cowork to Claude Code and expanded for org-w
 - [x] `data_processor.py` confirmed in the repo
 
 ### Phase 2 — Replace CSV Exports with Salesforce MCP
-- Rewrite refresh skill to query Salesforce directly via MCP (read-only)
-- Pull Accounts, Opportunities, Activities, Contacts in one session
-- Join by Account ID (`id` field) — eliminates manual Monday morning export ritual
-- MCP should only activate when explicitly called (not ambient every session)
+- Query Salesforce directly via `mcp__claude_ai_Salesforce_MCP_Read_Only__soqlQuery` (read-only, already connected)
+- 4 SOQL queries replace 5 manual Excel exports — eliminates Monday morning download ritual
+- Claude writes results to `sfdc_raw.json` (gitignored) → `data_processor.py` reads it → same pipeline as today
+- **MCP only runs on explicit refresh request** — never ambient
+
+**New files for Phase 2:**
+```
+sfdc-query-bdr.json     ← SOQL queries + field mappings for BDR view
+sfdc_raw.json           ← gitignored intermediate output from MCP queries
+```
+
+**Key Salesforce field mappings (BDR):**
+| Schema field | Salesforce API name |
+|---|---|
+| `a` (name) | `Name` |
+| `s` (state) | `BillingState` |
+| `t` (tier) | `Account_Tier__c` |
+| `o` (owner) | `Owner.Name` |
+| `pop` | `Population__c` |
+| `leg` | `Legacy_Community_Development_Soft_Pick__c` |
+| `id` | `Id` |
+| `arr` (pipeline) | `ARR_Formula__c` on Opportunity |
+| `arr` (customer) | `Current_ARR_Dlrs__c` on Account |
+
+**Multi-team extensibility:** Each future team (AE, CS, Marketing) gets its own `sfdc-query-{team}.json` with different SOQL queries and field mappings. The map engine and `data_processor.py` don't change.
 
 ### Phase 3 — Add AE Pipeline Layer
 - Create `view-config-ae.json` with AE-specific statuses, roster, and filters
