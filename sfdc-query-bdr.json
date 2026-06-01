@@ -1,0 +1,32 @@
+{
+  "team": "bdr",
+  "description": "4 SOQL queries replacing the 5 manual Salesforce Excel exports for the BDR territory map.",
+  "notes": {
+    "accounts": "All ICP accounts created since program start. Account_Tier__c != null is the ICP filter. Returns ~25k records — more comprehensive than the Excel report which was filtered to BDR-owned accounts only.",
+    "pipeline": "Open pipeline only (IsClosed=false). Multiple opps per account are resolved in data_processor.py — highest-priority stage wins.",
+    "customers": "Accounts at active customer stages. Implementation + 1+ Module Live + All Modules Live = ~148 customers.",
+    "activities": "Aggregate query: one row per account with their most recent task date. MAX(CreatedDate) used since ActivityDate doesn't support MAX. Returns ~8k distinct accounts with activity since Jan 2023."
+  },
+  "queries": {
+    "accounts":   "SELECT Id, Name, BillingState, Account_Tier__c, Owner.Name, Population__c, Legacy_Community_Development_Soft_Pick__c, CreatedDate FROM Account WHERE Account_Tier__c != null AND CreatedDate >= 2021-03-10T00:00:00Z ORDER BY BillingState, Name",
+    "pipeline":   "SELECT AccountId, Account.Name, StageName, ARR_Formula__c FROM Opportunity WHERE IsClosed = false AND StageName IN ('Initial Interest', 'Meeting Booked', 'Sales Qualified', 'Demo', 'Proposal', 'Verbal')",
+    "customers":  "SELECT Id, Name, BillingState, Account_Status__c, Current_ARR_Dlrs__c, Legacy_Community_Development_Soft_Pick__c FROM Account WHERE Account_Status__c IN ('Implementation', '1+ Module Live', 'All Modules Live')",
+    "activities": "SELECT AccountId, MAX(CreatedDate) FROM Task WHERE AccountId != null AND ActivityDate >= 2023-01-01 GROUP BY AccountId"
+  },
+  "fieldMap": {
+    "account_name":  "Name",
+    "account_id":    "Id",
+    "state":         "BillingState",
+    "tier":          "Account_Tier__c",
+    "owner":         "Owner.Name",
+    "population":    "Population__c",
+    "legacy":        "Legacy_Community_Development_Soft_Pick__c",
+    "created":       "CreatedDate",
+    "pipeline_stage":"StageName",
+    "pipeline_arr":  "ARR_Formula__c",
+    "customer_arr":  "Current_ARR_Dlrs__c",
+    "customer_status":"Account_Status__c"
+  },
+  "customerStatuses": ["Implementation", "1+ Module Live", "All Modules Live"],
+  "tierMap": {"Tier 1": "1", "Tier 2": "2", "Tier 3": "3", "Tier S": "S"}
+}

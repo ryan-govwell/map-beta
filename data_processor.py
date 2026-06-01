@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Weekly data processor for the GovWell Territory Dashboard.
-Version A: full ICP refresh (uses new ICP export as ground-truth account list).
 
-Reads:
-  - 5 Salesforce exports in All Data for Map/
-  - Previous bdr-map.html for geocoord carryover (regex-extract)
+Two data sources (automatically detected):
+  1. sfdc_raw.json   — output of a Salesforce MCP refresh (Phase 2, preferred)
+  2. All Data for Map/ — 5 manual Salesforce Excel exports (fallback)
 
 Writes:
   - accounts_data.json (NOT bdr-map.html — build-map.py does that)
@@ -19,36 +18,10 @@ random.seed(42)
 
 # ---------------- Paths ----------------
 BASE = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = f"{BASE}/All Data for Map"
-HTML_SRC     = f"{BASE}/bdr-map.html"       # legacy — no longer used for coords
+DATA_DIR     = f"{BASE}/All Data for Map"
 OUT_JSON     = f"{BASE}/accounts_data.json"
 GEOCODE_CSV  = f"{BASE}/geocode_master.csv"
-
-# Pick the latest file matching each glob pattern
-def latest(pat):
-    files = sorted(glob.glob(os.path.join(DATA_DIR, pat)))
-    if not files:
-        raise FileNotFoundError(f"No files match {pat} in {DATA_DIR}")
-    return files[-1]
-
-ICP_FILE     = latest("ICP Accounts by State_ARC-*.xlsx")
-PIPE_FILE    = latest("AE Sales Pipeline_ARC-*.xlsx")
-# Note: matches both "All Customers by State with Comp-*" (new) and "All Customers by State with Competitor-*" (legacy);
-# pick the most recent by file mtime / lexical order, but prefer ones containing the latest date
-def latest_customer():
-    cands = sorted(glob.glob(os.path.join(DATA_DIR, "All Customers by State with*.xlsx")),
-                   key=os.path.getmtime)
-    if not cands:
-        raise FileNotFoundError("No customers file found")
-    return cands[-1]
-CUST_FILE    = latest_customer()
-MEET_FILE    = latest("Meetings Booked by Cold Call per State-*.xlsx")
-ACT_FILE     = latest("Activities by Account-*.xlsx")
-
-print("Using exports:")
-for n, p in [("ICP", ICP_FILE), ("PIPE", PIPE_FILE), ("CUST", CUST_FILE),
-             ("MEET", MEET_FILE), ("ACT", ACT_FILE)]:
-    print(f"  {n:5s} {os.path.basename(p)}")
+SFDC_RAW     = f"{BASE}/sfdc_raw.json"
 
 # ---------------- Status priority ----------------
 PRIORITY = {"cu":10, "vb":9, "pr":8, "dm":7, "sq":6, "mb":5, "ii":4, "cl":3, "t":2, "u":1}
@@ -64,139 +37,231 @@ STAGE_TO_CODE = {
 
 GARBAGE = {"subtotal","count","grand total","sum","total"}
 
-# ---------------- Step 1: ICP master list ----------------
-def load_icp(path):
-    raw = pd.read_excel(path, header=None)
-    # find header row containing "Account Name"
-    header_row = None
-    for i in range(20):
-        row = raw.iloc[i].astype(str).tolist()
-        if any("Account Name" in v for v in row):
-            header_row = i
-            break
-    assert header_row is not None, "ICP: could not find header row"
-    # use raw column indices: 1=state, 2=tier, 4=account name, 6=created, 7=owner
-    df = raw.iloc[header_row+1:].copy()
-    df.columns = list(range(raw.shape[1]))
-    rename_map = {1:"state", 2:"tier", 4:"account", 6:"created", 7:"owner"}
-    hdr = raw.iloc[header_row].astype(str).tolist()
-    # auto-detect optional columns by header name
-    for j, v in enumerate(hdr):
-        vl = v.lower()
-        if "account id (18)" in vl:
-            rename_map[j] = "sf_id"
-            print(f"  ICP: found Account ID (18) column at col {j} ({hdr[j]!r})")
-        elif "population" in vl:
-            rename_map[j] = "pop"
-        elif "legacy" in vl:
-            rename_map[j] = "icp_leg"
-    if "sf_id" not in rename_map.values():
-        print("  ICP: no 'Account ID (18)' column — 'id' field will be omitted from output")
-    df = df.rename(columns=rename_map)
-    # ffill state and tier (grouped rows)
-    df["state"] = df["state"].ffill()
-    df["tier"]  = df["tier"].ffill()
-    # filter garbage rows (subtotal, total, count etc.)
-    df = df[df["state"].notna()]
-    df = df[~df["state"].astype(str).str.lower().isin(GARBAGE)]
-    df = df[~df["tier"].astype(str).str.lower().isin(GARBAGE)]
-    df = df[df["account"].notna()]
-    df = df[df["account"].astype(str).str.lower() != "subtotal"]
-    df = df[df["account"].astype(str).str.lower() != "total"]
-    # Drop rows where account is the literal "Count" subtotal artifact (col 4 is account, col 3 is "Count")
-    # Already handled above by checking state is not "subtotal"
-    # tier: "Tier 1" -> "1"
-    df["tier"] = df["tier"].astype(str).str.replace("Tier ", "", regex=False).str.strip()
-    df["account"] = df["account"].astype(str).str.strip()
-    df["state"] = df["state"].astype(str).str.strip()
-    df["owner"] = df["owner"].astype(str).str.strip()
-    if "sf_id" not in df.columns:
-        df["sf_id"] = None
-    return df.reset_index(drop=True)
+# ── Data loading ─────────────────────────────────────────────────────────────
+# Prefer sfdc_raw.json (Salesforce MCP refresh) over Excel exports when present.
 
-icp = load_icp(ICP_FILE)
-print(f"\nICP accounts after cleaning: {len(icp)}")
-print("State distribution top 10:")
-print(icp["state"].value_counts().head(10).to_string())
+sfdc_mode = os.path.exists(SFDC_RAW)
 
-# Deduplicate by (account, state) — keep first
-icp = icp.drop_duplicates(subset=["account","state"], keep="first").reset_index(drop=True)
-print(f"After dedup: {len(icp)}")
+if sfdc_mode:
+    # ── Salesforce MCP path ───────────────────────────────────────────────────
+    print(f"Source: {SFDC_RAW} (Salesforce MCP)")
+    with open(SFDC_RAW, encoding="utf-8") as f:
+        raw = json.load(f)
+    print(f"  Refreshed: {raw.get('refreshed', 'unknown')}")
 
-# ---------------- Step 2: Pipeline ----------------
-pipe = pd.read_excel(PIPE_FILE, header=11, usecols=[1,3,5,8,9,10],
-                    names=["stage","opp","arr","owner","account","legacy"])
-# Stage is grouped (only first row per stage has stage value) — ffill
-pipe["stage"] = pipe["stage"].ffill()
-# Then drop subtotal/total rows (account is NaN or "Subtotal"/"Total" appears in opp)
-pipe = pipe[pipe["account"].notna()]
-pipe = pipe[~pipe["stage"].astype(str).str.lower().isin(GARBAGE)]
-pipe = pipe[~pipe["account"].astype(str).str.lower().isin(GARBAGE)]
-pipe["account"] = pipe["account"].astype(str).str.strip()
-pipe["stage"]   = pipe["stage"].astype(str).str.strip()
-print(f"\nPipeline rows: {len(pipe)}")
-print(pipe["stage"].value_counts().to_string())
+    # Step 1: ICP accounts
+    rows = []
+    for a in raw.get("accounts", []):
+        tier = (a.get("Account_Tier__c") or "").replace("Tier ", "").strip()
+        rows.append({
+            "account": (a.get("Name") or "").strip(),
+            "state":   (a.get("BillingState") or "").strip(),
+            "tier":    tier,
+            "owner":   ((a.get("Owner") or {}).get("Name") or "").strip(),
+            "pop":     a.get("Population__c"),
+            "icp_leg": a.get("Legacy_Community_Development_Soft_Pick__c"),
+            "created": a.get("CreatedDate", ""),
+            "sf_id":   (a.get("Id") or "").strip(),
+        })
+    icp = pd.DataFrame(rows)
+    icp = icp[icp["account"].str.strip() != ""]
+    icp = icp.drop_duplicates(subset=["account", "state"], keep="first").reset_index(drop=True)
+    print(f"\nICP accounts: {len(icp)}")
+    print("State distribution top 10:")
+    print(icp["state"].value_counts().head(10).to_string())
 
-# Map stages -> code
-pipe["code"] = pipe["stage"].map(STAGE_TO_CODE)
-# For accounts in pipeline, take HIGHEST priority code
-pipe["prio"] = pipe["code"].map(PRIORITY).fillna(0)
-pipe_sorted  = pipe.sort_values("prio", ascending=False)
-pipe_best    = pipe_sorted.drop_duplicates(subset=["account"], keep="first")
+    # Step 2: Pipeline
+    pipe_by_acct = {}
+    for p in raw.get("pipeline", []):
+        acct  = ((p.get("Account") or {}).get("Name") or "").strip()
+        stage = (p.get("StageName") or "").strip()
+        code  = STAGE_TO_CODE.get(stage)
+        if not acct or not code:
+            continue
+        prio = PRIORITY.get(code, 0)
+        if prio > PRIORITY.get((pipe_by_acct.get(acct) or {}).get("code", "u"), 0):
+            pipe_by_acct[acct] = {"code": code, "arr": p.get("ARR_Formula__c"), "legacy": None}
+    print(f"\nPipeline rows: {len(raw.get('pipeline', []))}")
+    from collections import Counter as _C
+    print(pd.Series([p.get("StageName") for p in raw.get("pipeline", [])]).value_counts().to_string())
 
-# ---------------- Step 3: Customers ----------------
-cust = pd.read_excel(CUST_FILE, header=10, usecols=[1,3,4,5,6],
-                    names=["state","account","legacy","pop","arr"])
-cust["state"] = cust["state"].ffill()
-cust = cust[cust["account"].notna()]
-cust = cust[~cust["state"].astype(str).str.lower().isin(GARBAGE)]
-cust = cust[~cust["account"].astype(str).str.lower().isin(GARBAGE)]
-cust["account"] = cust["account"].astype(str).str.strip()
-print(f"\nCustomers: {len(cust)}")
+    # Step 3: Customers
+    cust_by_acct = {}
+    for c in raw.get("customers", []):
+        name = (c.get("Name") or "").strip()
+        if name:
+            cust_by_acct[name] = {
+                "legacy": c.get("Legacy_Community_Development_Soft_Pick__c"),
+                "arr":    c.get("Current_ARR_Dlrs__c"),
+            }
+    print(f"\nCustomers: {len(cust_by_acct)}")
 
-# ---------------- Step 4: Meetings Booked ----------------
-meet = pd.read_excel(MEET_FILE, header=12, usecols=[1,3,4,5],
-                    names=["state","stage","owner","opp"])
-meet["state"] = meet["state"].ffill()
-meet = meet[meet["opp"].notna()]
-meet = meet[~meet["state"].astype(str).str.lower().isin(GARBAGE)]
-# Extract account name from opp name (opps have format "ACCOUNT NAME New Business Opportunity ...")
-def acct_from_opp(opp):
-    s = str(opp)
-    # remove trailing " New Business Opportunity ..." or " New Business Opportunity 2025-..."
-    s = re.sub(r"\s+New Business Opportunity.*$", "", s)
-    s = re.sub(r"\s+Renewal.*$", "", s)
-    s = re.sub(r"\s+Expansion.*$", "", s)
-    return s.strip()
-meet["account"] = meet["opp"].apply(acct_from_opp)
-meet["code"]    = meet["stage"].map(STAGE_TO_CODE)
-print(f"Meetings Booked rows: {len(meet)}")
+    # Step 4: Meetings (open pipeline covers this; meet_by_acct stays empty)
+    meet_by_acct = {}
+    print(f"Meetings Booked rows: (covered by pipeline query)")
 
-# ---------------- Step 5: Activities ----------------
-act = pd.read_excel(ACT_FILE, header=11, usecols=[1,3,4,5],
-                   names=["state","atype","account","date"])
-act["state"] = act["state"].ffill()
-act = act[act["account"].apply(lambda x: isinstance(x, str))]
-act = act[~act["state"].astype(str).str.lower().isin(GARBAGE)]
-act["account"] = act["account"].astype(str).str.strip()
-# parse date -> month YYYY-MM
-def parse_month(d):
-    if pd.isna(d): return None
-    try:
-        dt = pd.to_datetime(d, errors="coerce")
-        if pd.isna(dt): return None
-        return dt.strftime("%Y-%m")
-    except Exception:
-        return None
-act["month"] = act["date"].apply(parse_month)
-print(f"Activities rows: {len(act)}")
+    # Step 5: Activities (aggregate — one row per account: AccountId + MAX(CreatedDate))
+    id_to_name = {(a.get("Id") or "").strip(): (a.get("Name") or "").strip()
+                  for a in raw.get("accounts", []) if a.get("Id")}
+    touched_accts = set()
+    latest_month_by_acct = {}
+    for act in raw.get("activities", []):
+        name = id_to_name.get(act.get("AccountId", ""), "")
+        if not name:
+            continue
+        touched_accts.add(name)
+        raw_date = str(act.get("expr0") or "")
+        if len(raw_date) >= 7:
+            month = raw_date[:7]  # "2026-04-15T..." → "2026-04"
+            if name not in latest_month_by_acct or month > latest_month_by_acct[name]:
+                latest_month_by_acct[name] = month
+    print(f"Activities rows: {len(raw.get('activities', []))}")
+    print(f"Distinct touched accounts (any time): {len(touched_accts)}")
 
-# Per-account latest month
-act_latest = act.dropna(subset=["month"]).sort_values("month", ascending=False)\
-                .drop_duplicates(subset=["account"], keep="first")[["account","month"]]
-touched_accts = set(act_latest["account"].astype(str))
-latest_month_by_acct = dict(zip(act_latest["account"], act_latest["month"]))
-print(f"Distinct touched accounts (any time): {len(touched_accts)}")
+else:
+    # ── Excel export path (fallback) ──────────────────────────────────────────
+    def latest(pat):
+        files = sorted(glob.glob(os.path.join(DATA_DIR, pat)))
+        if not files:
+            raise FileNotFoundError(f"No files match {pat} in {DATA_DIR}")
+        return files[-1]
+
+    def latest_customer():
+        cands = sorted(glob.glob(os.path.join(DATA_DIR, "All Customers by State with*.xlsx")),
+                       key=os.path.getmtime)
+        if not cands:
+            raise FileNotFoundError("No customers file found")
+        return cands[-1]
+
+    ICP_FILE  = latest("ICP Accounts by State_ARC-*.xlsx")
+    PIPE_FILE = latest("AE Sales Pipeline_ARC-*.xlsx")
+    CUST_FILE = latest_customer()
+    MEET_FILE = latest("Meetings Booked by Cold Call per State-*.xlsx")
+    ACT_FILE  = latest("Activities by Account-*.xlsx")
+
+    print("Using exports:")
+    for n, p in [("ICP", ICP_FILE), ("PIPE", PIPE_FILE), ("CUST", CUST_FILE),
+                 ("MEET", MEET_FILE), ("ACT", ACT_FILE)]:
+        print(f"  {n:5s} {os.path.basename(p)}")
+
+    # Step 1: ICP master list
+    def load_icp(path):
+        raw = pd.read_excel(path, header=None)
+        header_row = None
+        for i in range(20):
+            row = raw.iloc[i].astype(str).tolist()
+            if any("Account Name" in v for v in row):
+                header_row = i
+                break
+        assert header_row is not None, "ICP: could not find header row"
+        df = raw.iloc[header_row+1:].copy()
+        df.columns = list(range(raw.shape[1]))
+        rename_map = {1:"state", 2:"tier", 4:"account", 6:"created", 7:"owner"}
+        hdr = raw.iloc[header_row].astype(str).tolist()
+        for j, v in enumerate(hdr):
+            vl = v.lower()
+            if "account id (18)" in vl:
+                rename_map[j] = "sf_id"
+                print(f"  ICP: found Account ID (18) column at col {j} ({hdr[j]!r})")
+            elif "population" in vl:
+                rename_map[j] = "pop"
+            elif "legacy" in vl:
+                rename_map[j] = "icp_leg"
+        if "sf_id" not in rename_map.values():
+            print("  ICP: no 'Account ID (18)' column — 'id' field will be omitted from output")
+        df = df.rename(columns=rename_map)
+        df["state"] = df["state"].ffill()
+        df["tier"]  = df["tier"].ffill()
+        df = df[df["state"].notna()]
+        df = df[~df["state"].astype(str).str.lower().isin(GARBAGE)]
+        df = df[~df["tier"].astype(str).str.lower().isin(GARBAGE)]
+        df = df[df["account"].notna()]
+        df = df[df["account"].astype(str).str.lower() != "subtotal"]
+        df = df[df["account"].astype(str).str.lower() != "total"]
+        df["tier"]    = df["tier"].astype(str).str.replace("Tier ", "", regex=False).str.strip()
+        df["account"] = df["account"].astype(str).str.strip()
+        df["state"]   = df["state"].astype(str).str.strip()
+        df["owner"]   = df["owner"].astype(str).str.strip()
+        if "sf_id" not in df.columns:
+            df["sf_id"] = None
+        return df.reset_index(drop=True)
+
+    icp = load_icp(ICP_FILE)
+    print(f"\nICP accounts after cleaning: {len(icp)}")
+    print("State distribution top 10:")
+    print(icp["state"].value_counts().head(10).to_string())
+    icp = icp.drop_duplicates(subset=["account","state"], keep="first").reset_index(drop=True)
+    print(f"After dedup: {len(icp)}")
+
+    # Step 2: Pipeline
+    pipe = pd.read_excel(PIPE_FILE, header=11, usecols=[1,3,5,8,9,10],
+                        names=["stage","opp","arr","owner","account","legacy"])
+    pipe["stage"] = pipe["stage"].ffill()
+    pipe = pipe[pipe["account"].notna()]
+    pipe = pipe[~pipe["stage"].astype(str).str.lower().isin(GARBAGE)]
+    pipe = pipe[~pipe["account"].astype(str).str.lower().isin(GARBAGE)]
+    pipe["account"] = pipe["account"].astype(str).str.strip()
+    pipe["stage"]   = pipe["stage"].astype(str).str.strip()
+    print(f"\nPipeline rows: {len(pipe)}")
+    print(pipe["stage"].value_counts().to_string())
+    pipe["code"] = pipe["stage"].map(STAGE_TO_CODE)
+    pipe["prio"] = pipe["code"].map(PRIORITY).fillna(0)
+    pipe_best = pipe.sort_values("prio", ascending=False).drop_duplicates(subset=["account"], keep="first")
+    pipe_by_acct = dict(zip(pipe_best["account"], pipe_best.to_dict("records")))
+
+    # Step 3: Customers
+    cust = pd.read_excel(CUST_FILE, header=10, usecols=[1,3,4,5,6],
+                        names=["state","account","legacy","pop","arr"])
+    cust["state"] = cust["state"].ffill()
+    cust = cust[cust["account"].notna()]
+    cust = cust[~cust["state"].astype(str).str.lower().isin(GARBAGE)]
+    cust = cust[~cust["account"].astype(str).str.lower().isin(GARBAGE)]
+    cust["account"] = cust["account"].astype(str).str.strip()
+    print(f"\nCustomers: {len(cust)}")
+    cust_by_acct = {str(r["account"]).strip(): r.to_dict() for _, r in cust.iterrows()}
+
+    # Step 4: Meetings Booked
+    meet = pd.read_excel(MEET_FILE, header=12, usecols=[1,3,4,5],
+                        names=["state","stage","owner","opp"])
+    meet["state"] = meet["state"].ffill()
+    meet = meet[meet["opp"].notna()]
+    meet = meet[~meet["state"].astype(str).str.lower().isin(GARBAGE)]
+    def acct_from_opp(opp):
+        s = str(opp)
+        s = re.sub(r"\s+New Business Opportunity.*$", "", s)
+        s = re.sub(r"\s+Renewal.*$", "", s)
+        s = re.sub(r"\s+Expansion.*$", "", s)
+        return s.strip()
+    meet["account"] = meet["opp"].apply(acct_from_opp)
+    meet["code"]    = meet["stage"].map(STAGE_TO_CODE)
+    print(f"Meetings Booked rows: {len(meet)}")
+    meet_best = meet.dropna(subset=["code"]).sort_values(
+        "code", key=lambda c: c.map(PRIORITY).fillna(0), ascending=False
+    ).drop_duplicates(subset=["account"], keep="first")
+    meet_by_acct = dict(zip(meet_best["account"], meet_best["code"]))
+
+    # Step 5: Activities
+    act = pd.read_excel(ACT_FILE, header=11, usecols=[1,3,4,5],
+                       names=["state","atype","account","date"])
+    act["state"] = act["state"].ffill()
+    act = act[act["account"].apply(lambda x: isinstance(x, str))]
+    act = act[~act["state"].astype(str).str.lower().isin(GARBAGE)]
+    act["account"] = act["account"].astype(str).str.strip()
+    def parse_month(d):
+        if pd.isna(d): return None
+        try:
+            dt = pd.to_datetime(d, errors="coerce")
+            if pd.isna(dt): return None
+            return dt.strftime("%Y-%m")
+        except Exception:
+            return None
+    act["month"] = act["date"].apply(parse_month)
+    print(f"Activities rows: {len(act)}")
+    act_latest = act.dropna(subset=["month"]).sort_values("month", ascending=False)\
+                    .drop_duplicates(subset=["account"], keep="first")[["account","month"]]
+    touched_accts = set(act_latest["account"].astype(str))
+    latest_month_by_acct = dict(zip(act_latest["account"], act_latest["month"]))
+    print(f"Distinct touched accounts (any time): {len(touched_accts)}")
 
 # ---------------- Step 6: Load geocoords from geocode_master.csv (primary)
 #                          with accounts_data.json as fallback ----------------
@@ -262,16 +327,8 @@ STATE_CENTROIDS = {
 
 # ---------------- Step 7: Build accounts ----------------
 NEW_THRESHOLD = "2026-03-01"  # accounts created on/after Mar 1 2026 = "new"
-
-# index pipeline / customer / meeting by account name
-pipe_by_acct = dict(zip(pipe_best["account"], pipe_best.to_dict("records")))
-cust_by_acct = {}
-for _, r in cust.iterrows():
-    cust_by_acct[str(r["account"]).strip()] = r.to_dict()
-
-meet_best = meet.dropna(subset=["code"]).sort_values("code", key=lambda c: c.map(PRIORITY).fillna(0), ascending=False)\
-                 .drop_duplicates(subset=["account"], keep="first")
-meet_by_acct = dict(zip(meet_best["account"], meet_best["code"]))
+# pipe_by_acct, cust_by_acct, meet_by_acct, touched_accts, latest_month_by_acct
+# are populated above in the sfdc_mode / Excel loading block.
 
 def lookup_coords(name, state):
     # exact name

@@ -108,9 +108,42 @@ via `fetch('accounts_data.json')`. This keeps `bdr-map.html` at ~70 KB instead o
 
 ---
 
-## The 5 Salesforce Exports
+## Weekly Refresh — Two Paths
 
-All go in `All Data for Map/`. The processor picks the **latest file matching each glob**.
+### Path 1: Salesforce MCP (preferred)
+
+When Ali says "refresh the data from Salesforce", Claude runs these steps:
+
+**1. Run the 4 SOQL queries** from `sfdc-query-bdr.json` using `mcp__claude_ai_Salesforce_MCP_Read_Only__soqlQuery`:
+- `accounts` — all ICP accounts (~25k records)
+- `pipeline` — open opportunities
+- `customers` — accounts with active customer status
+- `activities` — latest task date per account (aggregate, ~8k rows)
+
+**2. Write all results to `sfdc_raw.json`** in this format:
+```json
+{
+  "refreshed": "2026-06-01T22:00:00Z",
+  "accounts":   [ ...Account records... ],
+  "pipeline":   [ ...Opportunity records... ],
+  "customers":  [ ...Account records... ],
+  "activities": [ ...{AccountId, expr0: "MAX(CreatedDate)"}... ]
+}
+```
+
+**3. Run `python3 data_processor.py`** — auto-detects `sfdc_raw.json` and uses it.
+
+**4. Run `python3 build-map.py`**, then `node smoke-test.js`, then push to GitHub.
+
+> `sfdc_raw.json` is gitignored — never committed. Delete it after a successful push to keep the repo clean.
+
+**Pagination:** If a query returns `"done": false`, the MCP tool handles it automatically. Verify `totalSize` on each result matches expected record counts.
+
+---
+
+### Path 2: Excel Exports (fallback)
+
+If `sfdc_raw.json` does not exist, `data_processor.py` reads from Excel files in `All Data for Map/`. The processor picks the **latest file matching each glob**.
 
 | Pattern | Contents |
 |---|---|
@@ -229,14 +262,20 @@ Blake Anderson, Mihir Shah, Maia Golub
 
 ## Weekly Refresh Workflow
 
+### With Salesforce MCP (preferred — say "refresh the data from Salesforce")
+1. Claude queries Salesforce via MCP (4 queries) → writes `sfdc_raw.json`
+2. Claude runs `python3 data_processor.py` → produces `accounts_data.json`
+3. Claude runs `python3 build-map.py` → writes `bdr-map.html`
+4. Claude runs `node smoke-test.js`
+5. Claude pushes `bdr-map.html` + `accounts_data.json` to GitHub
+6. Claude deletes `sfdc_raw.json` (gitignored, not needed after push)
+
+### With Excel exports (fallback — say "refresh the data from these exports")
 1. Ali downloads 5 new Salesforce exports into `All Data for Map/`
 2. Claude runs `data_processor.py` → produces `accounts_data.json`
 3. Run `python3 build-map.py` → writes `bdr-map.html`
-4. Run `node smoke-test.js` and `node runtime-test.js`
-5. Push via the `push-to-github` skill — pushes **both** `bdr-map.html` and `accounts_data.json` in one commit
-
-The `push-to-github` skill uses the GitHub Git Data API (blob → tree → commit → ref).
-`view-config-bdr.json` only needs to be pushed when it changes (rare — not weekly).
+4. Run `node smoke-test.js`
+5. Push `bdr-map.html` + `accounts_data.json` to GitHub
 
 ---
 
