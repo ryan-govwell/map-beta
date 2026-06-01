@@ -457,6 +457,16 @@ function _applyViewConfig(cfg){
   TOUCHED_ST    = new Set(cfg.statusGroups.touched);
   PIPELINE_FULL = new Set(cfg.statusGroups.pipelineFull);
   OWNER_ROSTER  = new Set(cfg.roster);
+  ICONS = {
+    cu: symbolIcon('cu', CUST_R, '#78350f', 1),
+    vb: symbolIcon('vb', DOT_R+1, '#14532d', 0.6),
+    pr: symbolIcon('pr', DOT_R+1, '#7c2d12', 0.6),
+    dm: symbolIcon('dm', DOT_R,   '#581c87', 0.6),
+    sq: symbolIcon('sq', DOT_R+1, '#164e63', 0.6),
+    mb: symbolIcon('mb', DOT_R,   '#1e3a8a', 0.5),
+    ii: symbolIcon('ii', DOT_R,   '#713f12', 0.5),
+  };
+  SHAPED = new Set(Object.keys(ICONS));
   VIEW_OWNER_LABEL = cfg.ownerLabel || 'Owner';
   const pillLbl = document.querySelector('.pill-lbl');
   if(pillLbl) pillLbl.textContent = cfg.ownerLabel;
@@ -730,17 +740,9 @@ const canvasRenderer = L.canvas({ padding: 0.5, pane: 'dotsPane' });
 const dotLayer = L.layerGroup().addTo(map);
 const custLayer = L.layerGroup().addTo(map);    // customers on top
 
-// Pre-build icons once (cached, so we reuse the same SVG blob)
-const ICONS = {
-  cu: symbolIcon('cu', CUST_R, '#78350f', 1),
-  vb: symbolIcon('vb', DOT_R+1, '#14532d', 0.6),
-  pr: symbolIcon('pr', DOT_R+1, '#7c2d12', 0.6),
-  dm: symbolIcon('dm', DOT_R,   '#581c87', 0.6),
-  sq: symbolIcon('sq', DOT_R+1, '#164e63', 0.6),
-  mb: symbolIcon('mb', DOT_R,   '#1e3a8a', 0.5),
-  ii: symbolIcon('ii', DOT_R,   '#713f12', 0.5),
-};
-const SHAPED = new Set(Object.keys(ICONS));
+// Built after view config loads (SYM_TYPE must be populated first)
+let ICONS = {};
+let SHAPED = new Set();
 
 function filterForView(accts){
   // Empty default — nothing renders until user activates a filter.
