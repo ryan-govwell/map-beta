@@ -20,8 +20,9 @@ random.seed(42)
 # ---------------- Paths ----------------
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{BASE}/All Data for Map"
-HTML_SRC = f"{BASE}/bdr-map.html"          # carry over geocoords
-OUT_JSON = f"{BASE}/accounts_data.json"
+HTML_SRC     = f"{BASE}/bdr-map.html"       # legacy — no longer used for coords
+OUT_JSON     = f"{BASE}/accounts_data.json"
+GEOCODE_CSV  = f"{BASE}/geocode_master.csv"
 
 # Pick the latest file matching each glob pattern
 def latest(pat):
@@ -192,25 +193,30 @@ touched_accts = set(act_latest["account"].astype(str))
 latest_month_by_acct = dict(zip(act_latest["account"], act_latest["month"]))
 print(f"Distinct touched accounts (any time): {len(touched_accts)}")
 
-# ---------------- Step 6: Carryover geocoords from accounts_data.json ----------------
-def load_prev_coords(json_path):
-    if not os.path.exists(json_path):
-        print("No previous accounts_data.json — all coords will be random")
-        return {}
-    try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            arr = json.load(f)
-    except Exception as e:
-        print(f"Could not load previous accounts_data.json: {e}")
-        return {}
+# ---------------- Step 6: Load geocoords from geocode_master.csv (primary)
+#                          with accounts_data.json as fallback ----------------
+def load_prev_coords():
     coords = {}
-    for a in arr:
-        name = a.get("a", "").strip()
-        if name and "la" in a and "lo" in a:
-            coords[name] = (a["la"], a["lo"], a.get("s", ""))
+    # Primary: geocode_master.csv — Google-geocoded, authoritative
+    if os.path.exists(GEOCODE_CSV):
+        try:
+            gc = pd.read_csv(GEOCODE_CSV, dtype=str)
+            for _, row in gc.iterrows():
+                name = str(row.get("name", "")).strip()
+                try:
+                    la, lo = float(row["lat"]), float(row["lon"])
+                except (ValueError, KeyError):
+                    continue
+                if name:
+                    coords[name] = (la, lo, str(row.get("state", "")))
+            print(f"  Geocode master loaded: {len(coords)} coords")
+        except Exception as e:
+            print(f"  Could not read geocode_master.csv: {e}")
+    else:
+        print("  No geocode_master.csv found")
     return coords
 
-prev_coords = load_prev_coords(OUT_JSON)
+prev_coords = load_prev_coords()
 print(f"\nPrev coords loaded: {len(prev_coords)}")
 
 # fuzzy-match helpers
