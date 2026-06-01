@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>GovWell — Territory Dashboard</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#080808;color:#e2e8f0;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Header ─────────────────────────────────────────────── */
+#header{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:46px;background:#0f0f0f;border-bottom:1px solid #222;flex-shrink:0;gap:10px}
+.logo{font-size:15px;font-weight:800;color:#fff;letter-spacing:-0.5px;white-space:nowrap}
+.logo span{color:#34d399}
+.subtitle{font-size:10px;color:#444;white-space:nowrap;padding-left:10px;border-left:1px solid #222}
+.date-chip{font-size:9px;padding:2px 7px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#888;white-space:nowrap}
+.header-left{display:flex;align-items:center;gap:10px}
+
+/* ── BDR Pills ──────────────────────────────────────────── */
+.bdr-row{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.bdr-row::-webkit-scrollbar{display:none}
+.pill-lbl{font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;padding-right:2px}
+.bdr-pill{font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid #222;cursor:pointer;color:#555;background:transparent;transition:all .12s;white-space:nowrap;font-weight:500;font-family:inherit}
+.bdr-pill:hover{color:#e2e8f0;border-color:#444}
+.bdr-pill.active{background:#1a3060;border-color:#3b82f6;color:#60a5fa;font-weight:600}
+
+/* ── Body ───────────────────────────────────────────────── */
+#body{display:flex;flex:1;overflow:hidden;min-height:0}
+#mapWrap{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-height:400px}
+#map{position:absolute;inset:0;width:100%;height:100%;background:#0a0a0a}
+#mapStatus{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:13px;z-index:999;text-align:center;padding:20px;background:rgba(0,0,0,.8);border:1px solid #333;border-radius:10px;display:none}
+#mapStatus.visible{display:block}
+#mapStatus .status-title{color:#fbbf24;font-weight:700;margin-bottom:8px;font-size:14px}
+#mapStatus .status-detail{color:#666;font-size:11px;line-height:1.5;margin-top:6px;font-family:ui-monospace,monospace}
+
+/* Tone down Leaflet default UI for dark theme */
+.leaflet-control-attribution{background:rgba(0,0,0,0.6) !important;color:#555 !important;font-size:9px !important;border-radius:6px 0 0 0 !important;padding:2px 6px !important}
+.leaflet-control-attribution a{color:#777 !important}
+.leaflet-bar{border:1px solid #333 !important;box-shadow:0 2px 10px rgba(0,0,0,.6) !important}
+.leaflet-bar a{background:#111 !important;color:#ccc !important;border-bottom-color:#333 !important;font-weight:600 !important}
+.leaflet-bar a:hover{background:#222 !important;color:#fff !important}
+
+/* ── State boundaries (overlay) ─────────────────────────── */
+.state-path{stroke:#111;stroke-width:0.8;cursor:pointer;transition:filter .12s}
+.state-path:hover{filter:brightness(1.7)}
+.state-path.selected{stroke:#fff !important;stroke-width:1.5 !important;filter:brightness(1.3)}
+
+/* ── Dots ───────────────────────────────────────────────── */
+.dots-overlay{position:absolute;pointer-events:none;will-change:transform}
+.dots-overlay path.dot{pointer-events:auto;cursor:pointer;transition:filter .1s}
+.dots-overlay path.dot:hover{filter:brightness(1.6) drop-shadow(0 0 4px white)}
+.dots-overlay text.dot-label{font-family:'Inter',sans-serif;font-size:10px;pointer-events:none;dominant-baseline:middle;paint-order:stroke;stroke:rgba(0,0,0,.75);stroke-width:2px;stroke-linejoin:round}
+
+/* ── Back / zoom controls ───────────────────────────────── */
+#backBtn{position:absolute;top:10px;left:10px;background:#111;border:1px solid #444;border-radius:7px;color:#ccc;font-size:11px;font-weight:600;padding:5px 12px;cursor:pointer;display:none;z-index:1000;font-family:inherit;transition:all .12s}
+#backBtn.visible{display:block}
+#backBtn:hover{background:#222;color:#fff;border-color:#888}
+
+/* ── Dot filter toggle ──────────────────────────────────── */
+/* Filter toggle bar — visible at all zoom levels (national + state). */
+#dotToggle{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #333;border-radius:24px;padding:4px;gap:3px;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.8)}
+.dt-btn{font-size:11px;padding:5px 16px;border-radius:18px;border:none;cursor:pointer;font-weight:700;font-family:inherit;color:#777;background:transparent;transition:all .15s;white-space:nowrap;letter-spacing:.01em}
+.dt-btn:hover{color:#ddd;background:#1e1e1e}
+.dt-btn.active-all{background:#2a2a2a;color:#fff}
+.dt-btn.active-customers{background:#78350f;color:#fde68a;box-shadow:0 0 12px rgba(251,191,36,.5)}
+.dt-btn.active-pipeline{background:#92400e;color:#fed7aa;box-shadow:0 0 12px rgba(251,146,60,.3)}
+.dt-btn.active-touched{background:#0369a1;color:#fff;box-shadow:0 0 12px rgba(56,189,248,.5)}
+.dt-btn.active-untouched{background:#334155;color:#e2e8f0;box-shadow:0 0 12px rgba(226,232,240,.3)}
+
+/* ── Population filter toggle ───────────────────────────── */
+#popToggle{position:absolute;top:54px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #222;border-radius:20px;padding:3px 5px;gap:2px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.7);white-space:nowrap}
+.pop-sep{width:1px;height:16px;background:#2a2a2a;margin:0 3px;flex-shrink:0}
+.pop-btn{font-size:10px;padding:3px 9px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-family:inherit;color:#555;background:transparent;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.pop-btn:hover{color:#ddd;background:#1a1a1a}
+.pop-btn .pop-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;opacity:.65}
+.pop-btn.pop-active{color:#fff;background:rgba(255,255,255,.08);box-shadow:0 0 8px rgba(255,255,255,.1)}
+.pop-btn.pop-active .pop-dot{opacity:1}
+
+/* ── Legacy software filter toggle ─────────────────────── */
+#legToggle{position:absolute;top:94px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #222;border-radius:20px;padding:3px 6px;gap:2px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.7);white-space:nowrap}
+.leg-btn{font-size:10px;padding:3px 9px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-family:inherit;color:#555;background:transparent;transition:all .15s;white-space:nowrap}
+.leg-btn:hover{color:#ddd;background:#1a1a1a}
+.leg-btn.leg-active{color:#fff;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c}
+
+/* ── Tooltip ────────────────────────────────────────────── */
+/* Mouse-following tooltip div (restored from pre-Leaflet map — matches the
+   old hover feel the user preferred). */
+#tooltip{position:fixed;background:rgba(10,10,10,0.97);border:1px solid #333;border-radius:10px;padding:11px 14px;font-size:11px;pointer-events:none;display:none;z-index:2000;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.9)}
+/* Dot icon cursor */
+.gw-dot-icon{cursor:pointer}
+.gw-dot-icon svg{overflow:visible}
+.tt-name{font-weight:700;color:#fff;margin-bottom:7px;font-size:12px;line-height:1.3}
+.tt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2.5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:10.5px;color:#666}
+.tt-row:last-child{border-bottom:none}
+.tt-val{color:#e2e8f0;font-weight:600;text-align:right;max-width:150px}
+.tt-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9.5px;font-weight:700}
+.tt-new{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.35);color:#34d399}
+
+#stateTip{position:fixed;background:rgba(10,10,10,0.96);border:1px solid #333;border-radius:8px;padding:9px 12px;font-size:11px;pointer-events:none;display:none;z-index:1500;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,.8)}
+#filterTip{position:fixed;background:rgba(10,10,10,0.97);border:1px solid #1e3a5f;border-radius:8px;padding:10px 13px;font-size:11px;pointer-events:none;display:none;z-index:2100;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,.9)}
+
+/* ── Legend ─────────────────────────────────────────────── */
+#legend{position:absolute;bottom:14px;right:14px;background:rgba(10,10,10,.95);border:1px solid #222;border-radius:10px;padding:11px 14px;min-width:155px;z-index:1000}
+.leg-title{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#444;margin-bottom:9px;font-weight:700}
+.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:10px;color:#777}
+.leg-row:last-child{margin-bottom:0}
+.leg-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.leg-cnt{margin-left:auto;font-size:9px;color:#444;font-weight:600}
+
+/* ── Basemap style toggle — bottom-left, beside zoom controls ─────── */
+#basemapToggle{position:absolute;bottom:10px;left:46px;display:flex;gap:3px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:3px}
+
+/* ── Last-refreshed chip (bottom-left, above basemap toggle) ─────── */
+#refreshedChip{position:absolute;bottom:48px;left:46px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:4px 10px;font-size:9px;color:#888;letter-spacing:.2px;white-space:nowrap;pointer-events:none}
+#refreshedChip .rc-lbl{color:#555;text-transform:uppercase;letter-spacing:.5px;font-size:8px;margin-right:4px}
+#refreshedChip .rc-val{color:#cbd5e1;font-weight:600}
+/* ── Search box — bottom-left, above refreshed chip, dropdown opens upward ── */
+#searchBox{position:absolute;bottom:82px;left:46px;z-index:1100;width:260px}
+#searchInput{width:100%;background:rgba(10,10,10,.95);border:1px solid #333;border-radius:8px;padding:7px 11px 7px 28px;font-size:11px;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color .12s;box-shadow:0 4px 16px rgba(0,0,0,.6)}
+#searchInput::placeholder{color:#555}
+#searchInput:focus{border-color:#60a5fa}
+#searchBox::before{content:"⌕";position:absolute;left:9px;top:7px;color:#555;font-size:14px;pointer-events:none}
+#searchResults{display:none;position:absolute;bottom:100%;left:0;right:0;margin-bottom:4px;background:rgba(10,10,10,.97);border:1px solid #333;border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;box-shadow:0 -8px 28px rgba(0,0,0,.8)}
+#searchResults.visible{display:block}
+#searchResults::-webkit-scrollbar{width:4px}
+#searchResults::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+.sr-row{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;transition:background .08s}
+.sr-row:last-child{border-bottom:none}
+.sr-row:hover,.sr-row.focus{background:rgba(96,165,250,.12)}
+.sr-name{font-size:11px;color:#e2e8f0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sr-meta{font-size:9px;color:#666;display:flex;gap:5px;align-items:center;flex-shrink:0}
+.sr-st{padding:1px 5px;border-radius:7px;font-size:8px;font-weight:700}
+.sr-empty{padding:10px 12px;color:#555;font-size:10px;text-align:center;font-style:italic}
+.sr-hint{padding:8px 11px;color:#444;font-size:9px;border-top:1px solid rgba(255,255,255,.04);background:rgba(0,0,0,.3)}
+
+.bm-btn{font-size:9px;padding:4px 9px;border-radius:5px;border:none;cursor:pointer;font-weight:700;font-family:inherit;color:#666;background:transparent;transition:all .12s;text-transform:uppercase;letter-spacing:.4px}
+.bm-btn:hover{color:#ccc}
+.bm-btn.active{background:#1e3a5f;color:#bfdbfe}
+
+/* ── Side Panel ─────────────────────────────────────────── */
+#panel{width:315px;background:#0f0f0f;border-left:1px solid #1e1e1e;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+#panelEmpty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;text-align:center}
+.empty-icon{font-size:30px;opacity:.1;color:#888}
+.empty-text{font-size:12px;color:#333;line-height:1.7}
+#panelContent{flex:1;overflow-y:auto;display:none}
+#panelContent.visible{display:block}
+#panelContent::-webkit-scrollbar{width:3px}
+#panelContent::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+
+.ph{padding:13px 14px 10px;background:#111;border-bottom:1px solid #1e1e1e;position:sticky;top:0;z-index:5}
+.ph-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.ph-meta{font-size:10px;color:#444;margin-top:2px}
+.ph-toggle{display:flex;gap:3px;margin-top:9px}
+.pht-btn{flex:1;font-size:10px;padding:5px 0;border-radius:6px;border:1px solid #222;cursor:pointer;font-weight:700;font-family:inherit;color:#666;background:transparent;transition:all .12s;text-align:center}
+.pht-btn:hover{color:#ddd;border-color:#444}
+.pht-btn.pa{background:#2a2a2a;border-color:#555;color:#fff}
+.pht-btn.pt{background:#0369a1;border-color:#38bdf8;color:#e0f2fe}
+.pht-btn.pc{background:#78350f;border-color:#fbbf24;color:#fef3c7}
+.pht-btn.pp{background:#92400e;border-color:#fb923c;color:#ffedd5}
+.pht-btn.pu{background:#1e293b;border-color:#94a3b8;color:#e2e8f0}
+.tier-toggle{display:flex;gap:3px;margin-top:5px}
+.tier-btn{flex:1;font-size:10px;padding:4px 0;border-radius:5px;border:1px solid #222;cursor:pointer;font-weight:800;font-family:inherit;color:#555;background:transparent;transition:all .12s;text-align:center;letter-spacing:.3px}
+.tier-btn:hover{color:#ddd;border-color:#444}
+.tier-btn.t1a{background:#166534;border-color:#4ade80;color:#bbf7d0}
+.tier-btn.t2a{background:#1e3a5f;border-color:#60a5fa;color:#bfdbfe}
+.tier-btn.t3a{background:#3b1764;border-color:#c084fc;color:#e9d5ff}
+.tier-btn.talla{background:#2a2a2a;border-color:#555;color:#fff}
+.tier-btn.tsa{background:#7c2d12;border-color:#fb923c;color:#fed7aa}
+.ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:9px}
+.ph-stat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 3px;text-align:center}
+.ph-sv{font-size:14px;font-weight:800;color:#fff;line-height:1}
+.ph-sl{font-size:7.5px;color:#444;text-transform:uppercase;letter-spacing:.3px;margin-top:3px}
+
+.ps{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,0.05)}
+.ps-title{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#555;font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.ps-badge{padding:1px 6px;border-radius:8px;font-size:8px;font-weight:700;text-transform:none;letter-spacing:0}
+.pr{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.pr:last-child{border-bottom:none}
+.pr-lbl{display:flex;align-items:center;gap:6px;font-size:11px;color:#777}
+.pr-val{font-weight:700;color:#e2e8f0;font-size:11px}
+
+.leg-cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.leg-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:7px;padding:8px 9px}
+.lc-val{font-size:18px;font-weight:800;line-height:1}
+.lc-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-top:2px}
+.lc-sub{font-size:9px;color:#555;margin-top:3px}
+.bar-wrap{background:#1a1a1a;border-radius:3px;height:4px;margin-top:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.bar-row{margin-bottom:5px}
+.bar-row:last-child{margin-bottom:0}
+.bar-hdr{display:flex;justify-content:space-between;margin-bottom:2px;font-size:9.5px}
+.bar-lbl{color:#555}
+.bar-pct{font-weight:700}
+
+.acct-row{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.acct-row:last-child{border-bottom:none}
+.acct-name{font-size:10.5px;color:#ccc;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-sub{font-size:9px;color:#444;margin-top:1px;display:flex;align-items:center;gap:5px}
+.tb{display:inline-block;padding:0 4px;border-radius:3px;font-size:8px;font-weight:700}
+.t1b{background:rgba(34,197,94,.15);color:#4ade80}
+.t2b{background:rgba(251,146,60,.15);color:#fb923c}
+.t3b{background:rgba(168,85,247,.15);color:#c084fc}
+.more-row{font-size:9px;color:#333;padding:3px 0}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="header-left">
+    <div class="logo">Gov<span>Well</span></div>
+    <div class="subtitle">Territory Dashboard</div>
+    <div id="dataDate" class="date-chip"></div>
+  </div>
+  <div class="bdr-row" id="bdrRow">
+    <span class="pill-lbl">BDR</span>
+    <!-- Pills rendered dynamically from data -->
+  </div>
+</div>
+
+<div id="body">
+  <div id="mapWrap">
+    <div id="map"></div>
+
+    <button id="backBtn" onclick="resetView()">← US</button>
+
+    <div id="dotToggle">
+      <button class="dt-btn" id="dt-all"        onclick="setDotFilter('all')">All</button>
+      <button class="dt-btn"            id="dt-customers"  onclick="setDotFilter('customers')">★ Customers</button>
+      <button class="dt-btn"            id="dt-pipeline"   onclick="setDotFilter('pipeline')">◆ Pipeline</button>
+      <button class="dt-btn"            id="dt-touched"    onclick="setDotFilter('touched')"   onmouseenter="showFilterTip(event,'touched')"   onmouseleave="hideFilterTip()">● Touched</button>
+      <button class="dt-btn"            id="dt-untouched"  onclick="setDotFilter('untouched')" onmouseenter="showFilterTip(event,'untouched')" onmouseleave="hideFilterTip()">○ Untouched</button>
+    </div>
+
+    <div id="popToggle">
+      <button class="pop-btn" id="pop-co-150k" onclick="setPopFilter('co-150k')"><span class="pop-dot" style="background:#64748b"></span>County &gt;150k</button>
+      <button class="pop-btn" id="pop-co-50k"  onclick="setPopFilter('co-50k')"><span class="pop-dot" style="background:#94a3b8"></span>50k–150k</button>
+      <button class="pop-btn" id="pop-co-25k"  onclick="setPopFilter('co-25k')"><span class="pop-dot" style="background:#a37c52"></span>25–50k</button>
+      <button class="pop-btn" id="pop-co-sm"   onclick="setPopFilter('co-sm')"><span class="pop-dot" style="background:#475569"></span>&lt;25k</button>
+      <div class="pop-sep"></div>
+      <button class="pop-btn" id="pop-ci-100k" onclick="setPopFilter('ci-100k')"><span class="pop-dot" style="background:#9333ea"></span>City &gt;100k</button>
+      <button class="pop-btn" id="pop-ci-50k"  onclick="setPopFilter('ci-50k')"><span class="pop-dot" style="background:#3b82f6"></span>50–100k</button>
+      <button class="pop-btn" id="pop-ci-25k"  onclick="setPopFilter('ci-25k')"><span class="pop-dot" style="background:#16a34a"></span>25–50k</button>
+      <button class="pop-btn" id="pop-ci-15k"  onclick="setPopFilter('ci-15k')"><span class="pop-dot" style="background:#ca8a04"></span>15–25k</button>
+      <button class="pop-btn" id="pop-ci-10k"  onclick="setPopFilter('ci-10k')"><span class="pop-dot" style="background:#be185d"></span>10–15k</button>
+      <button class="pop-btn" id="pop-ci-sm"   onclick="setPopFilter('ci-sm')"><span class="pop-dot" style="background:#dc2626"></span>&lt;10k</button>
+    </div>
+
+    <div id="legToggle">
+      <button class="leg-btn" id="leg-iworq"     onclick="setLegFilter('iworq')">iWorQ</button>
+      <button class="leg-btn" id="leg-tyler"      onclick="setLegFilter('tyler')">Tyler</button>
+      <button class="leg-btn" id="leg-opengov"    onclick="setLegFilter('opengov')">OpenGov</button>
+      <button class="leg-btn" id="leg-mygov"      onclick="setLegFilter('mygov')">MyGov</button>
+      <button class="leg-btn" id="leg-citizenserve" onclick="setLegFilter('citizenserve')">CitizenServe</button>
+      <button class="leg-btn" id="leg-granicus"   onclick="setLegFilter('granicus')">Granicus</button>
+      <button class="leg-btn" id="leg-accela"     onclick="setLegFilter('accela')">Accela</button>
+      <button class="leg-btn" id="leg-cloudpermit" onclick="setLegFilter('cloudpermit')">Cloudpermit</button>
+      <button class="leg-btn" id="leg-mgo"        onclick="setLegFilter('mgo')">MGO</button>
+    </div>
+
+    <div id="basemapToggle">
+      <button class="bm-btn active" data-bm="dark"  onclick="setBasemap('dark')">Dark</button>
+      <button class="bm-btn"        data-bm="light" onclick="setBasemap('light')">Light</button>
+      <button class="bm-btn"        data-bm="sat"   onclick="setBasemap('sat')">Satellite</button>
+      <button class="bm-btn"        data-bm="off"   onclick="setBasemap('off')">Off</button>
+    </div>
+
+    <div id="refreshedChip"><span class="rc-lbl">Last refreshed</span><span class="rc-val">%%DATA_REFRESHED%%</span></div>
+
+    <div id="searchBox">
+      <input id="searchInput" type="text" placeholder="Search accounts…" autocomplete="off" spellcheck="false" />
+      <div id="searchResults"></div>
+    </div>
+
+    <div id="legend"></div>
+
+  </div>
+
+  <div id="panel">
+    <div id="panelEmpty">
+      <div class="empty-icon">◎</div>
+      <div class="empty-text">Click any state to explore accounts, pipeline, and coverage data</div>
+    </div>
+    <div id="panelContent"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="stateTip"></div>
+<div id="filterTip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// Password gate
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  const KEY='gw_auth', PW='Permitplease';
+  if(sessionStorage.getItem(KEY)==='1') return;
+  const tries = 3;
+  for(let i=0;i<tries;i++){
+    const p = window.prompt('Territory Dashboard — enter password:');
+    if(p===null){ document.body.innerHTML='<div style="color:#555;padding:40px;font-family:sans-serif">Access canceled.</div>'; throw new Error('canceled'); }
+    if(p===PW){ sessionStorage.setItem(KEY,'1'); return; }
+  }
+  document.body.innerHTML='<div style="color:#555;padding:40px;font-family:sans-serif">Too many attempts.</div>';
+  throw new Error('pw-fail');
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// WEEKLY DATA — replace ACCOUNTS every Monday
+// ═══════════════════════════════════════════════════════════════════
+const DATA_VERSION = "%%DATA_VERSION%%";
+const ACCOUNTS = %%ACCOUNTS_JSON%%;
+// ═══════════════════════════════════════════════════════════════════
+// END WEEKLY DATA
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Visual config ─────────────────────────────────────────────────
+const STATUS_COLORS = {
+  cu:'#fbbf24', vb:'#22c55e', pr:'#f97316', dm:'#c084fc',
+  sq:'#00e5ff', mb:'#3b82f6', ii:'#fde047', cl:'#ef4444',
+  t :'#38bdf8', u :'#cbd5e1',
+};
+const STATUS_LABELS = {
+  cu:'Customer', vb:'Verbal', pr:'Proposal', dm:'Demo',
+  sq:'Sales Qualified', mb:'Meeting Booked', ii:'Initial Interest',
+  cl:'Closed Lost', t:'Touched', u:'Untouched',
+};
+const STATUS_ORDER  = ['cu','vb','pr','dm','sq','mb','ii','cl','t','u'];
+const PIPELINE_ST   = new Set(['vb','pr','dm','sq','mb','ii']);
+const TOUCHED_ST    = new Set(['vb','pr','dm','sq','mb','ii','cl','cu','t']);
+const PIPELINE_FULL = new Set(['ii','mb','sq','dm','pr','vb','cu']);
+
+const SYM_TYPE = {
+  cu:d3.symbolStar, vb:d3.symbolDiamond2, pr:d3.symbolTriangle,
+  dm:d3.symbolSquare, sq:d3.symbolAsterisk,
+  mb:d3.symbolWye, ii:d3.symbolCross, cl:d3.symbolCircle,
+  t:d3.symbolCircle, u:d3.symbolCircle,
+};
+const DOT_R = 7.5;
+const CUST_R = 11;
+
+const ABBR = {
+  Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",
+  Colorado:"CO",Connecticut:"CT",Delaware:"DE","District of Columbia":"DC",
+  Florida:"FL",Georgia:"GA",Hawaii:"HI",Idaho:"ID",Illinois:"IL",Indiana:"IN",
+  Iowa:"IA",Kansas:"KS",Kentucky:"KY",Louisiana:"LA",Maine:"ME",Maryland:"MD",
+  Massachusetts:"MA",Michigan:"MI",Minnesota:"MN",Mississippi:"MS",Missouri:"MO",
+  Montana:"MT",Nebraska:"NE",Nevada:"NV","New Hampshire":"NH","New Jersey":"NJ",
+  "New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND",
+  Ohio:"OH",Oklahoma:"OK",Oregon:"OR",Pennsylvania:"PA","Rhode Island":"RI",
+  "South Carolina":"SC","South Dakota":"SD",Tennessee:"TN",Texas:"TX",Utah:"UT",
+  Vermont:"VT",Virginia:"VA",Washington:"WA","West Virginia":"WV",Wisconsin:"WI",Wyoming:"WY"
+};
+const FIPS = {
+  "01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California",
+  "08":"Colorado","09":"Connecticut","10":"Delaware","11":"District of Columbia",
+  "12":"Florida","13":"Georgia","15":"Hawaii","16":"Idaho","17":"Illinois",
+  "18":"Indiana","19":"Iowa","20":"Kansas","21":"Kentucky","22":"Louisiana",
+  "23":"Maine","24":"Maryland","25":"Massachusetts","26":"Michigan","27":"Minnesota",
+  "28":"Mississippi","29":"Missouri","30":"Montana","31":"Nebraska","32":"Nevada",
+  "33":"New Hampshire","34":"New Jersey","35":"New Mexico","36":"New York",
+  "37":"North Carolina","38":"North Dakota","39":"Ohio","40":"Oklahoma","41":"Oregon",
+  "42":"Pennsylvania","44":"Rhode Island","45":"South Carolina","46":"South Dakota",
+  "47":"Tennessee","48":"Texas","49":"Utah","50":"Vermont","51":"Virginia",
+  "53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
+};
+
+// ── Pre-compute per-state stats ───────────────────────────────────
+const byState = {};
+ACCOUNTS.forEach(a => {
+  if(!a.s||!ABBR[a.s]) return;
+  if(!byState[a.s]) byState[a.s]={
+    total:0,touched:0,pipeline:0,customers:0,untouched:0,
+    vb:0,pr:0,dm:0,sq:0,mb:0,ii:0,cl:0,custArr:0,
+  };
+  const s=byState[a.s];
+  const tch = TOUCHED_ST.has(a.st);
+  s.total++;
+  if(tch) s.touched++; else s.untouched++;
+  if(PIPELINE_ST.has(a.st)) s.pipeline++;
+  if(a.st==='cu'){ s.customers++; s.custArr+=(a.arr||0); }
+  if(s[a.st]!==undefined) s[a.st]++;
+});
+
+// ── App state ─────────────────────────────────────────────────────
+let activeBdr    = '';
+let currentState = null;
+// Default: no dots shown. User picks a filter (or BDR, or state) to reveal accounts.
+let dotFilter    = 'none';
+let activeTier   = 0;
+let currentBasemap = 'dark';
+
+// ── Build BDR pills — restricted to the canonical 12-person roster ───
+// Salesforce exports include AEs and other non-BDR owners (Asher Rosenfeld,
+// Jenny Allison, Quinzel Perry, etc.) — we filter those out here so the
+// pill row only shows actual BDRs. Accounts owned by non-roster people
+// still appear on the map; they just don't get a pill of their own.
+const BDR_ROSTER = new Set([
+  'Catherine Silvestri','Nick Martino','Ali Cohen','Ryan Minter','Alicia Gopal',
+  'Lucy Nemerov','Hugh Bargeron','Sydney Ireland','Emily Murnane','Ben Laddis',
+  'Blake Anderson','Mihir Shah','Maia Golub',
+]);
+(function buildPills(){
+  const counts = {};
+  ACCOUNTS.forEach(a => { if(a.o) counts[a.o] = (counts[a.o]||0)+1; });
+  // Always show every roster member as a pill, even with 0 accounts —
+  // new BDRs (e.g. just-onboarded reps) need a button before any
+  // accounts have been reassigned to them in Salesforce.
+  const owners = Array.from(BDR_ROSTER)
+    .map(name => [name, counts[name] || 0])
+    .sort((a,b) => b[1]-a[1])
+    .map(([name]) => name);
+  const row = document.getElementById('bdrRow');
+  const allBtn = document.createElement('button');
+  allBtn.className = 'bdr-pill active';
+  allBtn.dataset.bdr = '';
+  allBtn.textContent = 'All';
+  row.appendChild(allBtn);
+  owners.forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'bdr-pill';
+    b.dataset.bdr = name;
+    b.textContent = name.split(' ')[0];
+    b.title = name;
+    row.appendChild(b);
+  });
+  document.querySelectorAll('.bdr-pill').forEach(b=>
+    b.addEventListener('click',()=>{
+      const bdrVal = b.dataset.bdr;
+      if(bdrVal === ''){
+        activeBdr = '';
+        document.querySelectorAll('.bdr-pill').forEach(x=>x.classList.toggle('active',x===b));
+      } else {
+        const isActive = b.classList.contains('active');
+        activeBdr = isActive ? '' : bdrVal;
+        const allPill = document.querySelector('.bdr-pill[data-bdr=""]');
+        document.querySelectorAll('.bdr-pill').forEach(x=>{
+          if(x===b) x.classList.toggle('active',!isActive);
+          else if(x===allPill) x.classList.toggle('active', isActive);
+          else x.classList.remove('active');
+        });
+      }
+      // Picking a BDR is a narrowing gesture — if no filter is set yet, surface
+      // the whole territory so they see something on the map.
+      if(activeBdr && dotFilter === 'none') setDotFilter('all');
+      renderDots();
+      updateChoro();
+      renderPanel(currentState || null);
+    })
+  );
+})();
+
+// ── Population filter ─────────────────────────────────────────────
+const POP_BUCKETS = [
+  { id:'co-150k', type:'county', min:150000, max:Infinity  },
+  { id:'co-50k',  type:'county', min:50000,  max:150000    },
+  { id:'co-25k',  type:'county', min:25000,  max:50000     },
+  { id:'co-sm',   type:'county', min:0,      max:25000     },
+  { id:'ci-100k', type:'city',   min:100000, max:Infinity  },
+  { id:'ci-50k',  type:'city',   min:50000,  max:100000    },
+  { id:'ci-25k',  type:'city',   min:25000,  max:50000     },
+  { id:'ci-15k',  type:'city',   min:15000,  max:25000     },
+  { id:'ci-10k',  type:'city',   min:10000,  max:15000     },
+  { id:'ci-sm',   type:'city',   min:0,      max:10000     },
+];
+let popFilters = new Set(); // active bucket ids (multi-select)
+let legFilters = new Set(); // active legacy keys (multi-select)
+
+// Legacy filter key → substring match against account's leg field
+const LEG_KEYS = {
+  'iworq':'iworq', 'tyler':'tyler', 'opengov':'opengov', 'mygov':'mygov',
+  'citizenserve':'citizenserve', 'granicus':'granicus', 'accela':'accela',
+  'cloudpermit':'cloudpermit', 'mgo':'mgo'
+};
+
+function getEntityType(name){
+  return /\bcounty\b|\bparish\b/i.test(name) ? 'county' : 'city';
+}
+
+function setPopFilter(id){
+  if(popFilters.has(id)) popFilters.delete(id); else popFilters.add(id);
+  document.querySelectorAll('.pop-btn').forEach(b=>{
+    b.classList.toggle('pop-active', popFilters.has(b.id.replace('pop-','')));
+  });
+  if(popFilters.size > 0 && dotFilter === 'none') setDotFilter('all');
+  renderDots();
+  renderPanel(currentState || null);
+}
+
+function setLegFilter(key){
+  if(legFilters.has(key)) legFilters.delete(key); else legFilters.add(key);
+  document.querySelectorAll('.leg-btn').forEach(b=>{
+    b.classList.toggle('leg-active', legFilters.has(b.id.replace('leg-','')));
+  });
+  if(legFilters.size > 0 && dotFilter === 'none') setDotFilter('pipeline');
+  renderDots();
+  renderPanel(currentState || null);
+}
+
+// ── Dot filter ────────────────────────────────────────────────────
+function setDotFilter(f){
+  // Clicking the already-active filter toggles it off (back to "none" — no dots).
+  if(f !== 'none' && dotFilter === f) f = 'none';
+  dotFilter=f;
+  ['all','customers','pipeline','touched','untouched'].forEach(x=>{
+    const b=document.getElementById('dt-'+x);
+    if(!b) return;
+    b.classList.remove('active-all','active-customers','active-pipeline','active-touched','active-untouched');
+    if(x===f) b.classList.add(`active-${f}`);
+  });
+  renderDots();
+  renderPanel(currentState || null);
+}
+
+// ── Leaflet map setup ─────────────────────────────────────────────
+const map = L.map('map', {
+  center: [39.5, -98.35],
+  zoom: 4,
+  zoomControl: true,
+  preferCanvas: false,
+  worldCopyJump: false,
+  minZoom: 3,
+  maxZoom: 18,
+  // Smooth fractional zoom (trackpad pinch / wheel feels continuous)
+  zoomSnap: 0,              // fully continuous zoom — no snapping between levels
+  zoomDelta: 1,
+  scrollWheelZoom: false,   // disabled — replaced by custom smooth handler below
+  inertia: true,
+  zoomAnimation: true,
+  fadeAnimation: true,
+});
+// Keep +/- buttons visible in bottom-left (basemap toggle is now bottom-left too).
+map.zoomControl.setPosition('bottomleft');
+
+// ── Smooth trackpad zoom ───────────────────────────────────────────
+// Replaces Leaflet's default wheel handler entirely.
+// - goal is tracked independently of map.getZoom() (avoids reading
+//   mid-frame state that hasn't settled yet)
+// - Persistent RAF loop eases toward goal at 30%/frame (smooth decel)
+// - Native addEventListener {passive:false} so preventDefault is respected
+// - goal=null between gestures so cursor anchor resets each time
+(function(){
+  var goal = null, anchor = null, endTimer = null;
+
+  map.getContainer().addEventListener('wheel', function(e) {
+    e.preventDefault();
+    // Lock cursor position as zoom anchor at start of each gesture
+    var r = map.getContainer().getBoundingClientRect();
+    anchor = map.containerPointToLatLng(L.point(e.clientX - r.left, e.clientY - r.top));
+    // First event of gesture: seed goal from current zoom and clear animations
+    if (goal === null) { goal = map.getZoom(); map._stop(); }
+    // Normalise delta across modes (trackpad=pixels, mouse=lines, keyboard=pages)
+    var raw = e.deltaY;
+    if (e.deltaMode === 1) raw *= 20;
+    if (e.deltaMode === 2) raw *= 400;
+    goal -= raw / 100;   // sensitivity: ~100px raw delta per zoom level; tune here
+    goal = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), goal));
+    // After 200ms of silence, signal Leaflet that the gesture is done (loads tiles)
+    clearTimeout(endTimer);
+    endTimer = setTimeout(function() {
+      try { map._moveEnd(true); } catch(_) {}
+      goal = null;
+    }, 200);
+  }, {passive: false});
+
+  // Persistent RAF loop — runs every frame, only acts when a gesture is live
+  requestAnimationFrame(function tick() {
+    if (goal !== null && anchor !== null) {
+      var cur  = map.getZoom();
+      var diff = goal - cur;
+      if (Math.abs(diff) > 0.001) {
+        map.setZoomAround(anchor, cur + diff * 0.3, {animate: false});
+      }
+    }
+    requestAnimationFrame(tick);
+  });
+})();
+
+// ── Basemap tile layers ───────────────────────────────────────────
+// Perf-tuned:
+//   keepBuffer: 6         → keep 6 rings of tiles around the viewport, so
+//                           pans within that range show instantly (no blanks).
+//   updateWhenIdle: true  → only fetch new tiles after the user stops moving.
+//   updateWhenZooming:    → skip mid-animation tile fetches.
+//   crossOrigin: 'anon'   → let the browser cache tiles across reloads.
+//   maxNativeZoom: 18     → scale z=18 tiles for z=19+ instead of 404'ing.
+const TILE_OPTS = {
+  keepBuffer: 6,
+  updateWhenIdle: true,
+  updateWhenZooming: false,
+  crossOrigin: 'anonymous',
+  maxNativeZoom: 18,
+  maxZoom: 19,
+};
+const BASEMAPS = {
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    ...TILE_OPTS,
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd',
+  }),
+  light: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    ...TILE_OPTS,
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd',
+  }),
+  sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    ...TILE_OPTS,
+    attribution: 'Tiles © Esri',
+  }),
+  off: null, // no tile layer — pure dark background + state polygons
+};
+let activeTile = null;
+// NOTE: stateLayer is hoisted here (with `let`) because setBasemap runs
+// synchronously at module load — BEFORE the fetch that assigns stateLayer —
+// and `let` has a temporal-dead-zone error if referenced before initialization.
+let stateLayer = null;
+function setBasemap(name){
+  currentBasemap = name;
+  if(activeTile){ map.removeLayer(activeTile); activeTile = null; }
+  if(BASEMAPS[name]){
+    activeTile = BASEMAPS[name];
+    activeTile.addTo(map);
+    activeTile.bringToBack();
+  }
+  document.querySelectorAll('.bm-btn').forEach(b=>b.classList.toggle('active', b.dataset.bm===name));
+  // Invert choropleth fill visibility: on light/sat, states are mostly transparent so tiles show through
+  if(stateLayer){
+    stateLayer.setStyle(f=>styleForState(f));
+  }
+}
+setBasemap('dark');
+
+// ── Choropleth scale ──────────────────────────────────────────────
+const chScale = d3.scaleLinear()
+  .domain([0,0.4,0.75])
+  .range(['#161616','#2a2a2a','#404040'])
+  .clamp(true);
+
+function touchRate(name){
+  const d=byState[name]; if(!d||!d.total) return 0;
+  if(activeBdr){
+    const sc=ACCOUNTS.filter(a=>a.s===name&&a.o===activeBdr);
+    return sc.length?sc.filter(a=>TOUCHED_ST.has(a.st)).length/sc.length:0;
+  }
+  return d.touched/d.total;
+}
+function stateColor(n){ return chScale(touchRate(n)); }
+
+function styleForState(f){
+  const name = FIPS[String(f.id).padStart(2,'0')];
+  const sel = (name && name===currentState);
+  const onTiles = currentBasemap !== 'off';
+  return {
+    color: sel ? '#fff' : '#111',
+    weight: sel ? 1.5 : 0.8,
+    fillColor: stateColor(name),
+    fillOpacity: onTiles ? 0.30 : 1.0,
+    className: 'state-path' + (sel?' selected':''),
+  };
+}
+function updateChoro(){
+  if(stateLayer) stateLayer.setStyle(f=>styleForState(f));
+}
+
+// ── Symbol helpers ────────────────────────────────────────────────
+function symPath(st,r){
+  return d3.symbol().type(SYM_TYPE[st]).size(r*r*Math.PI)();
+}
+function shortName(name){
+  return name
+    .replace(/^(City Of|City of|Town Of|Town of|Village Of|Village of|Township Of|Township of|County Of|County of|Borough of|Borough Of)\s+/i,'')
+    .replace(/,\s*[A-Z]{2}$/,'').trim();
+}
+
+// Build an SVG divIcon with a D3-generated symbol path
+function symbolIcon(st, r, strokeColor, strokeWidth){
+  const sz = r*2 + 4;
+  const path = symPath(st, r);
+  const html = `<svg width="${sz}" height="${sz}" viewBox="${-sz/2} ${-sz/2} ${sz} ${sz}" style="overflow:visible"><path d="${path}" fill="${STATUS_COLORS[st]}" fill-opacity="0.92" stroke="${strokeColor||'none'}" stroke-width="${strokeWidth||0}"/></svg>`;
+  return L.divIcon({
+    html,
+    className: 'gw-dot-icon',
+    iconSize: [sz, sz],
+    iconAnchor: [sz/2, sz/2],
+  });
+}
+
+// ── Dot rendering via Leaflet-native markers ──────────────────────
+// Two renderers: a canvas renderer for the bulk of circle-based dots
+// (performance with 16k markers), and SVG marker divIcons for the
+// distinctive shape dots (cu, vb, pr, dm, sq, mb, ii — ~2k total).
+// Dedicated pane for canvas dots — above overlayPane (400) where the state
+// polygons live, below markerPane (600) where the SVG shape markers live.
+// Without this, the state polygon layer can steal hover events from circle
+// markers sitting underneath it, making the hover card not appear reliably.
+map.createPane('dotsPane');
+map.getPane('dotsPane').style.zIndex = 450;
+map.getPane('dotsPane').style.pointerEvents = 'auto';
+
+const canvasRenderer = L.canvas({ padding: 0.5, pane: 'dotsPane' });
+const dotLayer = L.layerGroup().addTo(map);
+const custLayer = L.layerGroup().addTo(map);    // customers on top
+
+// Pre-build icons once (cached, so we reuse the same SVG blob)
+const ICONS = {
+  cu: symbolIcon('cu', CUST_R, '#78350f', 1),
+  vb: symbolIcon('vb', DOT_R+1, '#14532d', 0.6),
+  pr: symbolIcon('pr', DOT_R+1, '#7c2d12', 0.6),
+  dm: symbolIcon('dm', DOT_R,   '#581c87', 0.6),
+  sq: symbolIcon('sq', DOT_R+1, '#164e63', 0.6),
+  mb: symbolIcon('mb', DOT_R,   '#1e3a8a', 0.5),
+  ii: symbolIcon('ii', DOT_R,   '#713f12', 0.5),
+};
+const SHAPED = new Set(Object.keys(ICONS));
+
+function filterForView(accts){
+  // Empty default — nothing renders until user activates a filter.
+  if(dotFilter==='none' && popFilters.size===0 && legFilters.size===0) return [];
+  let out = accts;
+  if(activeTier==='S')          out = out.filter(a=>a.pop!=null && a.pop>=50000);
+  else if(activeTier>0)         out = out.filter(a=>String(a.t)===String(activeTier));
+  if(dotFilter==='customers')   out = out.filter(a=>a.st==='cu');
+  else if(dotFilter==='pipeline')   out = out.filter(a=>PIPELINE_FULL.has(a.st));
+  else if(dotFilter==='touched')    out = out.filter(a=>TOUCHED_ST.has(a.st));
+  else if(dotFilter==='untouched')  out = out.filter(a=>a.st==='u');
+  // Population filter — OR logic across all selected buckets
+  if(popFilters.size > 0){
+    out = out.filter(a=>{
+      if(a.pop==null) return false;
+      return Array.from(popFilters).some(id=>{
+        const bucket = POP_BUCKETS.find(b=>b.id===id);
+        return bucket && getEntityType(a.a)===bucket.type && a.pop>=bucket.min && a.pop<bucket.max;
+      });
+    });
+  }
+  // Legacy software filter — OR logic across all selected solutions
+  if(legFilters.size > 0) out = out.filter(a=>Array.from(legFilters).some(k=>(a.leg||'').toLowerCase().includes(k)));
+  return out;
+}
+
+// Build the rich HTML tooltip for a given account (same info as the
+// previous map's hover card — name, status, tier, owner, ARR, legacy sw, etc).
+function tipHtml(d){
+  const col=STATUS_COLORS[d.st];
+  let extra='';
+  if(d.st==='cl'){
+    extra=`<div class="tt-row"><span>Outcome</span><span class="tt-val" style="color:#f87171">Closed Lost</span></div>
+           <div class="tt-row"><span>Last contact</span><span class="tt-val">Meeting was booked</span></div>`;
+  } else if(d.st==='cu'&&d.arr){
+    extra=`<div class="tt-row"><span>ARR</span><span class="tt-val" style="color:#fbbf24">$${d.arr.toLocaleString()}</span></div>`;
+  } else if(PIPELINE_ST.has(d.st)&&d.arr){
+    extra=`<div class="tt-row"><span>Deal ARR</span><span class="tt-val" style="color:#60a5fa">$${d.arr.toLocaleString()}</span></div>`;
+  }
+  const newBadge=d.n?`<span class="tt-new">✦ New — Mar 2026+</span>`:'';
+  const isPipeline = PIPELINE_ST.has(d.st)||d.st==='cu';
+  const legRow = (d.leg||isPipeline)
+    ? `<div class="tt-row"><span>Legacy software</span><span class="tt-val" style="color:#fb923c">${d.leg||'—'}</span></div>`
+    : '';
+  const ageRow=!d.n?`<div class="tt-row"><span>ICP status</span><span class="tt-val" style="color:#777">Established (pre-Mar 2026)</span></div>`:'';
+  const fmtMonth = ym => { const [y,m]=ym.split('-'); return new Date(+y,+m-1).toLocaleString('en-US',{month:'short',year:'numeric'}); };
+  const touchRow = d.st==='t'&&d.ld
+    ? `<div class="tt-row"><span>Last touched</span><span class="tt-val" style="color:#38bdf8">${fmtMonth(d.ld)}</span></div>`
+    : '';
+  const stateRow = `<div class="tt-row"><span>State</span><span class="tt-val">${d.s||'—'}</span></div>`;
+  const popRow = d.pop!=null
+    ? `<div class="tt-row"><span>Population</span><span class="tt-val">${d.pop.toLocaleString()}</span></div>`
+    : '';
+  return `
+    <div class="tt-name">${d.a} ${newBadge}</div>
+    <div class="tt-row"><span>Status</span>
+      <span class="tt-val"><span class="tt-badge" style="background:${col}22;border:1px solid ${col}55;color:${col}">${STATUS_LABELS[d.st]}</span></span>
+    </div>
+    <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
+    ${stateRow}${popRow}${ageRow}${touchRow}${legRow}${extra}
+    <div class="tt-row"><span>Owner</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
+  `;
+}
+
+function buildMarker(a){
+  let m;
+  if(SHAPED.has(a.st)){
+    m = L.marker([a.la, a.lo], { icon: ICONS[a.st], riseOnHover: true });
+  } else {
+    const r = a.st === 'cu' ? CUST_R : DOT_R;
+    m = L.circleMarker([a.la, a.lo], {
+      renderer: canvasRenderer,
+      radius: r,
+      fillColor: STATUS_COLORS[a.st],
+      fillOpacity: a.st === 'u' ? 0.75 : 0.88,
+      color: a.st === 'u' ? '#475569' : a.st === 't' ? '#0c4a6e' : a.st === 'cl' ? '#7f1d1d' : 'none',
+      weight: (a.st === 'u' || a.st === 't' || a.st === 'cl') ? 0.8 : 0,
+      // `bubblingMouseEvents:false` so the state layer doesn't steal our hovers
+      bubblingMouseEvents: false,
+    });
+  }
+  // Mouse-following hover tooltip — matches the old pre-Leaflet behavior the
+  // user preferred (cursor-tracked, not anchored above the marker).
+  m.on('mouseover', (e) => showDotTip(e.originalEvent, a));
+  m.on('mousemove', (e) => moveTip(e.originalEvent, tipEl));
+  m.on('mouseout',  () => hideDotTip());
+  m.on('click',     (e) => { L.DomEvent.stop(e); zoomToDot(a); });
+  return m;
+}
+
+function renderDots(){
+  dotLayer.clearLayers();
+  custLayer.clearLayers();
+
+  let all = ACCOUNTS.filter(a => a.la && a.lo && (!activeBdr || a.o===activeBdr));
+  if(currentState) all = all.filter(a => a.s === currentState);
+  // No national-level suppression — all statuses render, filter bar does the rest.
+
+  const visible = filterForView(all);
+
+  // Lower priority first, higher on top
+  const ordered = [...visible].sort((a,b) =>
+    STATUS_ORDER.indexOf(b.st) - STATUS_ORDER.indexOf(a.st)
+  );
+
+  ordered.forEach(a => {
+    const m = buildMarker(a);
+    if(a.st === 'cu') custLayer.addLayer(m);
+    else              dotLayer.addLayer(m);
+  });
+}
+
+// ── Tooltips ──────────────────────────────────────────────────────
+const tipEl=document.getElementById('tooltip');
+const stTipEl=document.getElementById('stateTip');
+
+function showDotTip(ev,d){
+  const col=STATUS_COLORS[d.st];
+  let extra='';
+  if(d.st==='cl'){
+    extra=`<div class="tt-row"><span>Outcome</span><span class="tt-val" style="color:#f87171">Closed Lost</span></div>
+           <div class="tt-row"><span>Last contact</span><span class="tt-val">Meeting was booked</span></div>`;
+  } else if(d.st==='cu'&&d.arr){
+    extra=`<div class="tt-row"><span>ARR</span><span class="tt-val" style="color:#fbbf24">$${d.arr.toLocaleString()}</span></div>`;
+  } else if(PIPELINE_ST.has(d.st)&&d.arr){
+    extra=`<div class="tt-row"><span>Deal ARR</span><span class="tt-val" style="color:#60a5fa">$${d.arr.toLocaleString()}</span></div>`;
+  }
+  const newBadge=d.n?`<span class="tt-new">✦ New — Mar 2026+</span>`:'';
+  const isPipeline = PIPELINE_ST.has(d.st)||d.st==='cu';
+  const legRow = (d.leg||isPipeline)
+    ? `<div class="tt-row"><span>Legacy software</span><span class="tt-val" style="color:#fb923c">${d.leg||'—'}</span></div>`
+    : '';
+  const ageRow=!d.n?`<div class="tt-row"><span>ICP status</span><span class="tt-val" style="color:#777">Established (pre-Mar 2026)</span></div>`:'';
+  const fmtMonth = ym => { const [y,m]=ym.split('-'); return new Date(+y,+m-1).toLocaleString('en-US',{month:'short',year:'numeric'}); };
+  const touchRow = d.st==='t'&&d.ld
+    ? `<div class="tt-row"><span>Last touched</span><span class="tt-val" style="color:#38bdf8">${fmtMonth(d.ld)}</span></div>`
+    : '';
+
+  const popRow2 = d.pop!=null
+    ? `<div class="tt-row"><span>Population</span><span class="tt-val">${d.pop.toLocaleString()}</span></div>`
+    : '';
+  tipEl.innerHTML=`
+    <div class="tt-name">${d.a} ${newBadge}</div>
+    <div class="tt-row"><span>Status</span>
+      <span class="tt-val"><span class="tt-badge" style="background:${col}22;border:1px solid ${col}55;color:${col}">${STATUS_LABELS[d.st]}</span></span>
+    </div>
+    <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
+    ${popRow2}${ageRow}${touchRow}${legRow}${extra}
+    <div class="tt-row"><span>Owner</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
+  `;
+  tipEl.style.display='block'; moveTip(ev,tipEl);
+}
+function hideDotTip(){ tipEl.style.display='none'; }
+
+function showStateTip(ev,name){
+  const d=byState[name]; if(!d) return;
+  const rate=d.total?Math.round(d.touched/d.total*100):0;
+  const col=rate>60?'#4ade80':rate>35?'#facc15':'#f87171';
+  stTipEl.innerHTML=`
+    <div style="font-weight:700;color:#fff;font-size:11px;margin-bottom:5px">${name}</div>
+    <div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;font-size:10px">
+      <span style="color:#555">ICP Accounts</span><span style="color:#e2e8f0;font-weight:700">${d.total.toLocaleString()}</span>
+      <span style="color:#555">Touched</span><span style="color:${col};font-weight:700">${rate}%</span>
+      <span style="color:#555">In Pipeline</span><span style="color:#60a5fa;font-weight:700">${d.pipeline}</span>
+      <span style="color:#555">Customers</span><span style="color:#fbbf24;font-weight:700">${d.customers}</span>
+    </div>`;
+  stTipEl.style.display='block'; moveTip(ev,stTipEl);
+}
+function hideStateTip(){ stTipEl.style.display='none'; }
+
+const fTipEl = document.getElementById('filterTip');
+function showFilterTip(ev, filter){
+  const scope = currentState
+    ? ACCOUNTS.filter(a=>a.s===currentState&&(!activeBdr||a.o===activeBdr))
+    : ACCOUNTS.filter(a=>(!activeBdr||a.o===activeBdr));
+  let base;
+  if(filter==='touched')   base = scope.filter(a=>TOUCHED_ST.has(a.st));
+  else                     base = scope.filter(a=>a.st==='u');
+  const total = base.length;
+  const newCount = base.filter(a=>a.n).length;
+  const pct = total>0 ? Math.round(newCount/total*100) : 0;
+  fTipEl.innerHTML=`
+    <div style="font-weight:700;color:#e2e8f0;font-size:11px;margin-bottom:5px">
+      ${filter==='touched'?'Touched':'Untouched'} ${currentState?'· '+currentState:'(All States)'}
+    </div>
+    <div style="display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:10px">
+      <span style="color:#555">Total accounts</span><span style="color:#e2e8f0;font-weight:700">${total.toLocaleString()}</span>
+      <span style="color:#555">✦ New (Mar 2026+)</span><span style="color:#34d399;font-weight:700">${newCount.toLocaleString()} <span style="color:#555">(${pct}%)</span></span>
+    </div>`;
+  fTipEl.style.display='block';
+  moveTip(ev,fTipEl);
+}
+function hideFilterTip(){ fTipEl.style.display='none'; }
+
+function moveTip(ev,el){
+  const mw=window.innerWidth,mh=window.innerHeight,tw=250,th=170;
+  el.style.left=(ev.clientX+14+tw>mw?ev.clientX-tw-8:ev.clientX+14)+'px';
+  el.style.top =(ev.clientY+th+10>mh?ev.clientY-th-6:ev.clientY+10)+'px';
+}
+
+// ── Panel ─────────────────────────────────────────────────────────
+function pctStr(n,d){ return d>0?Math.round(n/d*100)+'%':'—'; }
+
+function iconSvg(st,r){
+  return `<svg width="${r*2}" height="${r*2}" viewBox="${-r} ${-r} ${r*2} ${r*2}"><path d="${symPath(st,r)}" fill="${STATUS_COLORS[st]}" fill-opacity="${st==='u'?.7:.9}"/></svg>`;
+}
+
+function renderPanel(name){
+  // `name` may be null/undefined → render a national summary across all states.
+  const isNational = !name;
+  if(!isNational){
+    const s=byState[name]; if(!s) return;
+  }
+  document.getElementById('panelEmpty').style.display='none';
+  const pc=document.getElementById('panelContent');
+  pc.classList.add('visible');
+
+  const scopeAll = isNational
+    ? ACCOUNTS.filter(a => !activeBdr || a.o===activeBdr)
+    : ACCOUNTS.filter(a => a.s===name && (!activeBdr || a.o===activeBdr));
+  const N=scopeAll.length;
+  const tch=scopeAll.filter(a=>TOUCHED_ST.has(a.st)).length;
+  const pipe=scopeAll.filter(a=>PIPELINE_ST.has(a.st)).length;
+  const cust=scopeAll.filter(a=>a.st==='cu').length;
+  const tc=pctStr(tch,N);
+  const touchCol=N&&tch/N>0.6?'#4ade80':N&&tch/N>0.35?'#facc15':'#f87171';
+
+  function legacyNewSection(){
+    const legN   = scopeAll.filter(a=>!a.n).length;
+    const legTch = scopeAll.filter(a=>!a.n&&TOUCHED_ST.has(a.st)).length;
+    const newN   = scopeAll.filter(a=>a.n).length;
+    const newTch = scopeAll.filter(a=>a.n&&TOUCHED_ST.has(a.st)).length;
+
+    function tierBars(isNew){
+      return [1,2,3].map(t=>{
+        const accts=scopeAll.filter(a=>a.t==t&&(isNew?a.n:!a.n));
+        const tN=accts.length; if(!tN) return '';
+        const tTch=accts.filter(a=>TOUCHED_ST.has(a.st)).length;
+        const pct=tN?Math.round(tTch/tN*100):0;
+        const col=pct>60?'#4ade80':pct>35?'#facc15':'#f87171';
+        const tierLabel=`T${t} ${isNew?'New':'Legacy'}`;
+        return `<div class="bar-row">
+          <div class="bar-hdr">
+            <span class="bar-lbl">${tierLabel} (${tN} accts)</span>
+            <span class="bar-pct" style="color:${col}">${pct}%</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        </div>`;
+      }).join('');
+    }
+
+    return `
+    <div class="ps">
+      <div class="ps-title">
+        Legacy ICP Accounts
+        <span class="ps-badge" style="background:rgba(239,68,68,.15);color:#f87171">Pre-Mar 2026</span>
+      </div>
+      <div class="leg-cards">
+        <div class="leg-card">
+          <div class="lc-val" style="color:#e2e8f0">${legN.toLocaleString()}</div>
+          <div class="lc-lbl">Legacy ICP</div>
+          <div class="lc-sub">${pctStr(legN,N)} of total</div>
+        </div>
+        <div class="leg-card">
+          <div class="lc-val" style="color:${legN?pctStr(legTch,legN)>'60%'?'#4ade80':'#facc15':'#555'}">${pctStr(legTch,legN)}</div>
+          <div class="lc-lbl">Legacy Touched</div>
+          <div class="lc-sub">${legTch} accts</div>
+        </div>
+      </div>
+      ${tierBars(false)}
+    </div>
+    <div class="ps">
+      <div class="ps-title">
+        New ICP Accounts
+        <span class="ps-badge" style="background:rgba(52,211,153,.15);color:#34d399">Mar 2026+</span>
+      </div>
+      <div class="leg-cards">
+        <div class="leg-card">
+          <div class="lc-val" style="color:#34d399">${newN.toLocaleString()}</div>
+          <div class="lc-lbl">New ICP</div>
+          <div class="lc-sub">${pctStr(newN,N)} of total</div>
+        </div>
+        <div class="leg-card">
+          <div class="lc-val" style="color:${newN?pctStr(newTch,newN)>'60%'?'#4ade80':'#facc15':'#555'}">${pctStr(newTch,newN)}</div>
+          <div class="lc-lbl">New Touched</div>
+          <div class="lc-sub">${newTch} accts</div>
+        </div>
+      </div>
+      ${newN?tierBars(true):'<div class="more-row">No new accounts in this state</div>'}
+    </div>`;
+  }
+
+  function pipelineSection(){
+    const stages=['vb','pr','dm','sq','mb','ii'];
+    const sNames={vb:'Verbal',pr:'Proposal',dm:'Demo',sq:'Sales Qualified',mb:'Meeting Booked',ii:'Initial Interest'};
+    const rows=stages.map(st=>{
+      const cnt=scopeAll.filter(a=>a.st===st).length;
+      return cnt?`<div class="pr">
+        <div class="pr-lbl">${iconSvg(st,8)} ${sNames[st]}</div>
+        <div class="pr-val" style="color:${STATUS_COLORS[st]}">${cnt}</div>
+      </div>`:'';
+    }).join('');
+    return rows?`<div class="ps"><div class="ps-title">Active Pipeline</div>${rows}</div>`:'';
+  }
+
+  function customersSection(){
+    const ca=scopeAll.filter(a=>a.st==='cu');
+    if(!ca.length) return '';
+    const totalArr=ca.reduce((s,a)=>s+(a.arr||0),0);
+    return `<div class="ps">
+      <div class="ps-title">
+        Customers
+        <span class="ps-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">${ca.length} active · $${Math.round(totalArr/1000)}K ARR</span>
+      </div>
+      ${ca.map(a=>`<div class="acct-row">
+        <div class="acct-name">★ ${a.a}</div>
+        <div class="acct-sub"><span style="color:#fbbf24">${a.arr?'$'+a.arr.toLocaleString():'—'}</span>${a.leg?` · <span style="color:#f97316">${a.leg}</span>`:''}</div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  function closedLostSection(){
+    const cl=scopeAll.filter(a=>a.st==='cl');
+    if(!cl.length) return '';
+    return `<div class="ps">
+      <div class="ps-title">Closed Lost — had meeting <span class="ps-badge" style="background:rgba(239,68,68,.12);color:#f87171">${cl.length}</span></div>
+      ${cl.slice(0,7).map(a=>`<div class="acct-row">
+        <div class="acct-name" style="color:#666">× ${a.a}</div>
+        ${a.leg?`<div class="acct-sub" style="color:#f97316">${a.leg}</div>`:''}
+      </div>`).join('')}
+      ${cl.length>7?`<div class="more-row">+ ${cl.length-7} more</div>`:''}
+    </div>`;
+  }
+
+  function untouchedSection(){
+    const byTier={1:[],2:[],3:[]};
+    scopeAll.filter(a=>a.st==='u').forEach(a=>{(byTier[parseInt(a.t)||3]).push(a);});
+    return [1,2,3].map(t=>{
+      const accts=byTier[t]; if(!accts.length) return '';
+      const nw=accts.filter(a=>a.n).length;
+      return `<div class="ps">
+        <div class="ps-title">
+          <span class="tb ${t===1?'t1b':t===2?'t2b':'t3b'}">Tier ${t}</span>
+          ${accts.length} untouched ${nw?`· <span style="color:#34d399">${nw} new</span>`:''}
+        </div>
+        ${accts.map(a=>`<div class="acct-row">
+          <div class="acct-name">${a.a}</div>
+          <div class="acct-sub">
+            <span class="tb ${t===1?'t1b':t===2?'t2b':'t3b'}">T${t}</span>
+            ${a.n?'<span style="color:#34d399">✦ New</span>':''}
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  function touchedSection(){
+    const tNoOpp=scopeAll.filter(a=>a.st==='t');
+    return `
+    ${pipelineSection()}
+    ${customersSection()}
+    ${closedLostSection()}
+    <div class="ps" style="border-bottom:none">
+      <div class="ps-title">Called — No Opportunity Yet <span class="ps-badge" style="background:#1a1a1a;color:#555">${tNoOpp.length}</span></div>
+      ${tNoOpp.map(a=>`<div class="acct-row">
+        <div class="acct-name">${a.a}</div>
+        <div class="acct-sub">
+          <span class="tb ${a.t==='1'?'t1b':a.t==='2'?'t2b':'t3b'}">T${a.t}</span>
+          ${a.n?'<span style="color:#34d399">✦ New</span>':''}
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  const body = dotFilter==='touched'   ? touchedSection()
+             : dotFilter==='untouched' ? untouchedSection()
+             : pipelineSection()+customersSection()+closedLostSection()+legacyNewSection();
+
+  const headerName = isNational ? 'United States' : name;
+  const headerMeta = isNational
+    ? 'All 50 states'
+    : (ABBR[name]||'');
+  pc.innerHTML=`
+  <div class="ph">
+    <div class="ph-name">${headerName}</div>
+    <div class="ph-meta">${headerMeta}${activeBdr?' · '+activeBdr.split(' ')[0]:''}</div>
+    <div class="ph-toggle">
+      <button class="pht-btn${dotFilter==='all'?' pa':''}"         onclick="setDotFilter('all')">All</button>
+      <button class="pht-btn${dotFilter==='customers'?' pc':''}"   onclick="setDotFilter('customers')">★ Cust.</button>
+      <button class="pht-btn${dotFilter==='pipeline'?' pp':''}"    onclick="setDotFilter('pipeline')">◆ Pipeline</button>
+      <button class="pht-btn${dotFilter==='touched'?' pt':''}"     onclick="setDotFilter('touched')">● Touched</button>
+      <button class="pht-btn${dotFilter==='untouched'?' pu':''}"   onclick="setDotFilter('untouched')">○ Untouched</button>
+    </div>
+    <div class="tier-toggle">
+      <button class="tier-btn${activeTier===0?' talla':''}"   onclick="setTier(0)">All Tiers</button>
+      <button class="tier-btn${activeTier===1?' t1a':''}"     onclick="setTier(1)">T1</button>
+      <button class="tier-btn${activeTier===2?' t2a':''}"     onclick="setTier(2)">T2</button>
+      <button class="tier-btn${activeTier===3?' t3a':''}"     onclick="setTier(3)">T3</button>
+      <button class="tier-btn${activeTier==='S'?' tsa':''}"   onclick="setTier('S')" title="Pop 50k+">S</button>
+    </div>
+    <div class="ph-stats">
+      <div class="ph-stat"><div class="ph-sv">${N.toLocaleString()}</div><div class="ph-sl">ICP</div></div>
+      <div class="ph-stat"><div class="ph-sv" style="color:${touchCol}">${tc}</div><div class="ph-sl">Touched</div></div>
+      <div class="ph-stat"><div class="ph-sv" style="color:#60a5fa">${pipe}</div><div class="ph-sl">Pipeline</div></div>
+      <div class="ph-stat"><div class="ph-sv" style="color:#fbbf24">${cust}</div><div class="ph-sl">Cust.</div></div>
+    </div>
+  </div>
+  ${body}`;
+}
+
+// ── Legend ────────────────────────────────────────────────────────
+function buildLegend(){
+  const rows=[
+    {st:'cu',label:'Customer'},{st:'vb',label:'Verbal'},{st:'pr',label:'Proposal'},
+    {st:'dm',label:'Demo'},{st:'sq',label:'Sales Qualified'},{st:'mb',label:'Meeting Booked'},
+    {st:'ii',label:'Initial Interest'},{st:'cl',label:'Closed Lost'},
+    {st:'t',label:'Touched'},{st:'u',label:'Untouched'},
+  ];
+  document.getElementById('legend').innerHTML=
+    `<div class="leg-title">Account Status</div>`+
+    rows.map(r=>{
+      const cnt=ACCOUNTS.filter(a=>a.st===r.st).length;
+      return `<div class="leg-row">
+        <span class="leg-icon">${iconSvg(r.st,8)}</span>
+        <span>${r.label}</span>
+        <span class="leg-cnt">${cnt.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+}
+
+// ── State selection + zoom ────────────────────────────────────────
+function setTier(n){
+  activeTier=n;
+  renderDots();
+  renderPanel(currentState || null);
+}
+
+// ── Dot click: zoom into the surrounding metropolitan area ─────────
+// Target z=10 (~30 miles across — covers a metro area + suburbs). If the
+// user is already zoomed in closer, we just pan; no surprise zoom-OUT.
+const METRO_ZOOM = 10;
+function zoomToDot(d){
+  const targetZ = Math.max(map.getZoom(), METRO_ZOOM);
+  map.flyTo([d.la, d.lo], targetZ, { duration: 0.6 });
+}
+// Alias retained for clarity at call sites
+function panToDot(d){ zoomToDot(d); }
+
+function selectState(name, layer){
+  currentState=name; activeTier=0;
+  // Clicking into a state is a narrowing gesture — auto-surface dots if the
+  // user hasn't picked a filter yet. Otherwise preserve their choice.
+  if(dotFilter === 'none') setDotFilter('all');
+  document.getElementById('backBtn').classList.add('visible');
+  document.getElementById('dotToggle').classList.add('visible');
+  if(layer && layer.getBounds){
+    // Fit the state with breathing room: one zoom level less than the natural
+    // tight fit, so dots aren't cramped against the edges.
+    const bounds = layer.getBounds();
+    const naturalZ = map.getBoundsZoom(bounds, false, [40, 40]);
+    const targetZ = Math.max(3, naturalZ - 1);
+    map.flyToBounds(bounds, { duration: 0.7, padding: [80, 80], maxZoom: targetZ });
+  }
+  updateChoro();
+  renderPanel(name);
+  renderDots();
+}
+
+function resetView(){
+  currentState=null;
+  // Reset back to the empty initial view — no dots until user re-selects.
+  setDotFilter('none');
+  document.getElementById('backBtn').classList.remove('visible');
+  // Panel switches from state view back to national summary (not empty).
+  renderPanel(null);
+  updateChoro();
+  // Continental US fit (matches initial view)
+  map.flyToBounds([[24.5,-125],[49.5,-66]], { duration: 0.6, padding: [20, 20] });
+}
+
+// ── Account search ────────────────────────────────────────────────
+// Free-text search over ACCOUNTS[].a. Shows a dropdown of matches with
+// state + status; selecting a result flies the map to that account and
+// pops the hover tooltip. Ensures the dot is visible (auto-switches to
+// "all" if the user hasn't picked a filter yet).
+(function setupSearch(){
+  const input   = document.getElementById('searchInput');
+  const results = document.getElementById('searchResults');
+  const box     = document.getElementById('searchBox');
+  if(!input || !results) return;
+  let focusIdx  = -1;
+  let lastMatches = [];
+  const norm = s => (s||'').toLowerCase();
+
+  function render(qRaw){
+    const q = norm(qRaw).trim();
+    if(!q){ results.classList.remove('visible'); results.innerHTML=''; focusIdx=-1; lastMatches=[]; return; }
+    const starts = [], contains = [];
+    for(const a of ACCOUNTS){
+      const n = norm(a.a);
+      if(n.startsWith(q)) starts.push(a);
+      else if(n.includes(q)) contains.push(a);
+      if(starts.length + contains.length >= 60) break;
+    }
+    const matches = starts.concat(contains).slice(0, 20);
+    lastMatches = matches;
+    focusIdx = -1;
+    if(!matches.length){
+      results.innerHTML = `<div class="sr-empty">No matching accounts</div>`;
+      results.classList.add('visible');
+      return;
+    }
+    const rows = matches.map((a,i) => {
+      const col = STATUS_COLORS[a.st] || '#888';
+      const lbl = (STATUS_LABELS[a.st] || '').split(' ')[0];
+      const st  = ABBR[a.s] || '';
+      return `<div class="sr-row" data-i="${i}">
+        <div class="sr-name">${a.a}</div>
+        <div class="sr-meta">
+          <span class="sr-st" style="background:${col}22;color:${col}">${lbl}</span>
+          <span>${st}</span>
+        </div>
+      </div>`;
+    }).join('');
+    results.innerHTML = rows + `<div class="sr-hint">↵ jump · ↑↓ navigate · esc close</div>`;
+    results.classList.add('visible');
+    [...results.querySelectorAll('.sr-row')].forEach(r=>{
+      r.addEventListener('click', () => selectResult(parseInt(r.dataset.i, 10)));
+    });
+  }
+
+  function selectResult(i){
+    const a = lastMatches[i]; if(!a || a.la==null || a.lo==null) return;
+    // Ensure the matched account is actually visible on the map.
+    if(dotFilter === 'none') setDotFilter('all');
+    const targetZ = Math.max(map.getZoom(), 10);
+    map.flyTo([a.la, a.lo], targetZ, { duration: 0.7 });
+    // Show the hover tooltip at the account's screen position after the
+    // fly-to settles (so the projection is accurate).
+    map.once('moveend', () => {
+      try {
+        const pt   = map.latLngToContainerPoint([a.la, a.lo]);
+        const rect = map.getContainer().getBoundingClientRect();
+        showDotTip({ clientX: rect.left + pt.x, clientY: rect.top + pt.y }, a);
+      } catch(err){ /* non-fatal */ }
+    });
+    results.classList.remove('visible');
+    input.value = a.a;
+  }
+
+  function debounce(fn, ms){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+  const renderDeb = debounce(() => render(input.value), 120);
+  input.addEventListener('input', renderDeb);
+  input.addEventListener('focus', () => { if(input.value.trim()) render(input.value); });
+  input.addEventListener('keydown', (e) => {
+    const rows = [...results.querySelectorAll('.sr-row')];
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      focusIdx = Math.min(rows.length - 1, focusIdx + 1);
+      rows.forEach((r, i) => r.classList.toggle('focus', i === focusIdx));
+      if(rows[focusIdx]) rows[focusIdx].scrollIntoView({block:'nearest'});
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      focusIdx = Math.max(0, focusIdx - 1);
+      rows.forEach((r, i) => r.classList.toggle('focus', i === focusIdx));
+      if(rows[focusIdx]) rows[focusIdx].scrollIntoView({block:'nearest'});
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      if(focusIdx < 0 && lastMatches.length) focusIdx = 0;
+      if(focusIdx >= 0) selectResult(focusIdx);
+    } else if(e.key === 'Escape'){
+      results.classList.remove('visible');
+      input.blur();
+    }
+  });
+  // Click outside closes the dropdown.
+  document.addEventListener('click', (e) => {
+    if(!box.contains(e.target)) results.classList.remove('visible');
+  });
+  // Keyboard shortcut: "/" focuses the search box from anywhere.
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if(e.key === '/'){ e.preventDefault(); input.focus(); input.select(); }
+  });
+})();
+
+// ── Keyboard + gesture zoom shortcuts ───────────────────────────────
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if(e.key === 'Escape'){
+    if(e.shiftKey) resetView();
+    else           map.zoomOut(1);
+    e.preventDefault();
+  } else if(e.key === 'Backspace'){
+    map.zoomOut(1);
+    e.preventDefault();
+  }
+});
+// Double right-click anywhere on the map → reset
+let lastCtxMenu = 0;
+map.on('contextmenu', (e) => {
+  const now = Date.now();
+  if(now - lastCtxMenu < 500){
+    resetView();
+    lastCtxMenu = 0;
+  } else {
+    lastCtxMenu = now;
+  }
+  // Suppress native menu so double-right-click doesn't spawn it
+  if(e.originalEvent) e.originalEvent.preventDefault();
+});
+
+// ── First paint: draw dots & legend immediately so the map is never empty ──
+// We do this BEFORE the state-boundaries fetch resolves, because the fetch
+// can stall or fail on restrictive networks — and the dots should show
+// regardless of whether state outlines load.
+map.fitBounds([[24.5,-125],[49.5,-66]], { padding:[20,20] });
+buildLegend();
+document.getElementById('dataDate').textContent = DATA_VERSION + ' · ' + ACCOUNTS.length.toLocaleString() + ' accounts';
+try {
+  renderDots();
+  renderPanel(null);   // national summary immediately on load
+  console.log('[bdr-map] initial renderDots OK — total accounts:', ACCOUNTS.length);
+} catch(err){
+  console.error('[bdr-map] renderDots threw:', err);
+}
+
+// ── Render state boundaries (non-blocking) ───────────────────────
+fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
+  .then(r => r.json())
+  .then(us => {
+    const states = topojson.feature(us, us.objects.states);
+    stateLayer = L.geoJSON(states, {
+      style: f => styleForState(f),
+      onEachFeature: (f, layer) => {
+        const name = FIPS[String(f.id).padStart(2,'0')];
+        if(!name) return;
+        layer.on('click', (e) => { L.DomEvent.stop(e); selectState(name, layer); });
+        layer.on('mousemove', (e) => { showStateTip(e.originalEvent, name); });
+        layer.on('mouseout', () => { hideStateTip(); });
+      }
+    }).addTo(map);
+    // Keep state layer under markers
+    if(stateLayer && stateLayer.bringToBack) stateLayer.bringToBack();
+  })
+  .catch(e => console.error('[bdr-map] State boundaries failed:', e));
+
+// ── Fallback state-click handler ──────────────────────────────────
+// The dot canvas pane (z-index 450) sits above the SVG state layer
+// (overlayPane, z-index 400), so DOM clicks on areas with canvas coverage
+// never reach the state polygons — layer.on('click') alone is unreliable.
+// We catch the map-level click event (fired by Leaflet when the canvas
+// renderer has no marker hit) and hit-test state features via d3.geoContains.
+map.on('click', (e) => {
+  if(!stateLayer) return;
+  const ll = [e.latlng.lng, e.latlng.lat];   // GeoJSON order
+  let hitName = null, hitLayer = null;
+  stateLayer.eachLayer(l => {
+    if(hitName) return;
+    if(l.feature && d3.geoContains(l.feature, ll)){
+      hitName = FIPS[String(l.feature.id).padStart(2,'0')];
+      hitLayer = l;
+    }
+  });
+  // Clicking the already-selected state is a no-op (they're already there);
+  // clicking a different state transitions straight to it.
+  if(hitName && hitName !== currentState) selectState(hitName, hitLayer);
+});
+</script>
+</body>
+</html>
