@@ -333,9 +333,9 @@ for _, row in icp.iterrows():
         if code == "u":
             code = "t"
     # build account dict
+    # Note: arr and id are intentionally omitted — repo is public.
+    # ARR is financial data; id exposes Salesforce IDs. Neither is needed by the map.
     o = {"a": name, "s": state, "t": str(tier), "o": owner, "st": code, "src": "bdr"}
-    if sf_id and sf_id.lower() not in ("nan", "none", ""):
-        o["id"] = sf_id
     coords = lookup_coords(name, state)
     if coords:
         la, lo = coords
@@ -358,11 +358,7 @@ for _, row in icp.iterrows():
             pass
     if legacy and str(legacy) != "nan":
         o["leg"] = str(legacy)
-    if arr_val and not pd.isna(arr_val):
-        try:
-            o["arr"] = int(float(arr_val))
-        except Exception:
-            pass
+    # arr intentionally not written — see public repo data policy in CLAUDE.md
     if code == "t" and name in latest_month_by_acct:
         o["ld"] = latest_month_by_acct[name]
     # new flag

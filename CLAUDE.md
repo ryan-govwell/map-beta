@@ -16,6 +16,34 @@ Ali is non-technical. When working in this project:
 
 ---
 
+## Public Repo Data Policy
+
+This repo is **public on GitHub**. The following rules apply to everything committed here — code, config, and data files:
+
+### Never commit
+- ARR, deal size, or any revenue/financial figures
+- Salesforce record IDs (Account ID, Opportunity ID, etc.)
+- API keys, tokens, passwords, or credentials of any kind
+- Raw Salesforce export files (`.xlsx`) — these go in `All Data for Map/` which is gitignored
+
+### Safe to commit
+- Account names and states (government entities, publicly known)
+- Pipeline status codes (`cu`, `sq`, `mb`, etc.) — needed for map functionality
+- BDR owner names — already public in `view-config-bdr.json`
+- Legacy software names — needed for legacy filter
+- Population, tier, coordinates, and other non-financial fields
+
+### How this applies to future phases
+
+**Phase 2 (Salesforce MCP):** When we add direct Salesforce querying, any fields containing financial data (ARR, ACV, deal value) must NOT be written to `accounts_data.json`. If the map ever needs to show ARR in the future, that data must come from an authenticated endpoint — not a file in this repo.
+
+**Phase 3/4 (AE, CS layers):** Same rule applies to all view-config and data files for other teams. Revenue and ID fields stay out of committed files.
+
+### Why `arr` and `id` were removed
+In June 2026, `arr` (customer ARR) and `id` (Salesforce Account ID) were removed from `accounts_data.json` to make the repo safely public. The map continues to function fully — ARR just no longer appears in tooltips or state panels.
+
+---
+
 ## What This Project Is
 
 A top-of-funnel territory intelligence dashboard for GovWell's BDR team. It visualizes ~17,500 ICP accounts across all 50 US states as dots on a Leaflet + D3.js map, color-coded by pipeline status, filterable by BDR owner, tier, and status. Refreshed weekly from 5 Salesforce exports.
