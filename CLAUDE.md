@@ -1,160 +1,167 @@
 # GovWell Territory Dashboard — CLAUDE.md
 
-**Owner:** Ali Cohen (ali@govwell.com)
+**Owner:** Ryan Minter (ryan@govwell.com)
 **Repo:** `acohenGW/govwell-state-of-territory`
-**Last updated:** June 1, 2026
+**Last updated:** June 2026
 
 ---
 
-## How to Work With Ali
+## How to Work With Ryan
 
-Ali is non-technical. When working in this project:
-- Explain things in plain language. Define jargon when you use it.
-- Assume Ali won't run terminal commands directly. Prefer double-clickable `.command` files or browser-injected buttons for anything user-facing.
-- Files Ali needs to see live in the **Territory Dashboard** folder. Session sandbox paths (`/sessions/...`) are internal — never show these to Ali.
-- Finished deliverables always go to `/Users/alicohen/Documents/Claude/Projects/Territory Dashboard/` and are presented with file cards.
+Ryan is on the GTM/BD team at GovWell. He manages territory intelligence tooling and is comfortable with technical concepts but not a developer. When working in this project:
+- Explain decisions in plain language but don't over-explain basics.
+- Ryan approves bash commands via Claude's permission prompt — do not ask him to run them manually.
+- Always update `REFACTOR.md` after any change to the project.
 
 ---
 
 ## Repository & Data Policy
 
-This repo is **private on GitHub** (GitHub Pro). The privacy boundary is the repo itself — collaborators must be explicitly invited.
+This repo is **private on GitHub**. The privacy boundary is the repo itself.
 
 ### Never commit
 - API keys, tokens, passwords, or credentials of any kind
-- Raw Salesforce export files (`.xlsx`) — gitignored, go in `All Data for Map/`
-- `sfdc_raw.json` — gitignored, intermediate Salesforce query output (may contain full ARR, IDs, etc.)
+- Raw Salesforce export CSV files
+- `sfdc_raw.json` — gitignored intermediate Salesforce MCP output
 
 ### Safe to commit
-All processed account data fields are safe to commit since the repo is private:
-- `arr` (customer ARR), `id` (Salesforce Account ID), pipeline status, owner names, legacy software, population, coordinates — everything the map needs
+All processed account data fields are safe since the repo is private:
+- `arr`, `id`, pipeline status, owner names, legacy software, population, coordinates
 
 ### Salesforce MCP rule — CRITICAL
-**Claude must never query Salesforce unless Ali explicitly asks for a data refresh.** The MCP tools exist in every session but must remain dormant. Querying Salesforce costs tokens and hits the live org. Only invoke `mcp__claude_ai_Salesforce_MCP_Read_Only__*` tools when Ali says something like "refresh the data from Salesforce" or "run the Salesforce refresh."
-
-### Multi-team data policy (Phase 3/4)
-When AE, CS, or other teams get their own views, each team's data file (`accounts_data_ae.json`, etc.) follows the same rule: safe to commit since the repo is private. Each team gets its own query config (`sfdc-query-ae.json`, etc.) — no changes to the map engine or shared infrastructure.
+**Never query Salesforce unless Ryan explicitly asks for a data refresh.** The MCP tools exist in every session but must stay dormant. Only invoke `mcp__claude_ai_Salesforce_MCP_Read_Only__*` when Ryan says something like "refresh the data from Salesforce."
 
 ---
 
 ## What This Project Is
 
-A top-of-funnel territory intelligence dashboard for GovWell's BDR team. It visualizes ~17,500 ICP accounts across all 50 US states as dots on a Leaflet + D3.js map, color-coded by pipeline status, filterable by BDR owner, tier, and status. Refreshed weekly from 5 Salesforce exports.
+A territory intelligence dashboard for GovWell's BDR team. It visualizes ~16,200 ICP accounts across all 50 US states as dots on a Leaflet + D3.js map, color-coded by pipeline Signal (Won/Customer, Mid Funnel, Top Funnel, Closed Lost). Accounts with no pipeline data render as neutral gray dots — no "Untouched" label until activity data is layered in.
+
+The map loads blank. Users opt in to what they see via a **Visibility panel** (top-left): show All accounts, or select one or more specific states.
 
 ---
 
-## Live Maps
+## Live Map
 
-- **BDR Territory Map (main):** https://acohengw.github.io/govwell-state-of-territory/bdr-map.html
-- **Original Map:** https://acohengw.github.io/govwell-state-of-territory/
-- **Password:** `Permitplease`
+- **URL:** https://acohengw.github.io/govwell-state-of-territory/bdr-map.html
+- **Password:** none (removed — Cloudflare handles auth)
+- **Local dev:** `python3 -m http.server 8080` from the project root → http://localhost:8080/bdr-map.html
 
-Only `bdr-map.html` gets updated on weekly refreshes. Do not overwrite `index.html`.
+Only `bdr-map.html` gets updated on refreshes. Do not overwrite `index.html`.
 
 ---
 
 ## File Structure
 
 ```
-Territory Dashboard/
-├── All Data for Map/            ← 5 Salesforce exports (replaced weekly)
-├── bdr-map-template.html        ← UI source of truth — edit this, not bdr-map.html
-├── view-config-bdr.json         ← BDR view config: statuses, roster, filters, owner label
-├── build-map.py                 ← Stamps version + timestamp into template → bdr-map.html
-├── data_processor.py            ← PERMANENT: reads exports → accounts_data.json
-├── smoke-test.js                ← Structural verification (Node + jsdom)
-├── runtime-test.js              ← Stubbed runtime verification (Node only)
-├── accounts_data.json           ← Processed account data (rebuilt each refresh, pushed to GitHub)
-├── geocode_master.csv           ← Coord lookup — persists across refreshes
-├── bdr-map.html                 ← Built deliverable, pushed to GitHub
-├── push-to-github.skill         ← Browser-injected GitHub pusher
-└── CLAUDE.md                    ← This file
+govwell-state-of-territory/
+├── pipeline/                    ← data processing (one script per object)
+│   ├── constants.py             ← BDR_TEAM, tier points, state codes, stage priority
+│   ├── process_accounts.py      ✓ SF accounts CSV → pipeline/accounts.csv
+│   ├── process_pipeline.py      ✓ SF opportunities CSV → pipeline/pipeline.csv
+│   ├── process_activities.py    ✓ SF activity CSV → pipeline/activities.csv
+│   ├── process_contacts.py      ✓ SF contacts CSV → pipeline/contacts.csv
+│   ├── process_customers.py     ✗ NOT BUILT YET
+│   ├── merge.py                 ✓ joins all four → accounts_data.json (5.3 MB)
+│   ├── accounts.csv             ← generated, not committed
+│   ├── pipeline.csv             ← generated, not committed
+│   ├── activities.csv           ← generated, not committed
+│   ├── contacts.csv             ← generated, not committed
+│   └── geo/
+│       └── geo_lookup.json      ← 17,460-entry coordinate lookup by account name
+├── bdr-map-template.html        ← UI source of truth — EDIT THIS, not bdr-map.html
+├── view-config-bdr.json         ← status codes, colors, symbols, roster
+├── build-map.py                 ← stamps version + timestamp into template → bdr-map.html
+├── accounts_data.json           ← built by merge.py, pushed to GitHub
+├── bdr-map.html                 ← build artifact — never edit directly
+├── geocode_master.csv           ← legacy coord cache (superseded by geo_lookup.json)
+├── sfdc-query-bdr.json          ← SOQL queries for future Salesforce MCP refresh
+├── smoke-test.js                ← structural verification
+├── REFACTOR.md                  ← living changelog — update after every change
+└── CLAUDE.md                    ← this file
 ```
 
 ### Critical rules
-- **Never edit `bdr-map.html` directly** — it's a build artifact. Edit the template, then rebuild.
-- **`data_processor.py` is permanent** — do not rewrite it from scratch. Update it.
-- **`build-map.py` uses relative paths** — always run from inside the Territory Dashboard folder.
-- **`build-map.py` validates** — refuses to write if either placeholder (`%%DATA_VERSION%%`, `%%DATA_REFRESHED%%`) is unsubstituted, or if `%%ACCOUNTS_JSON%%` accidentally appears in the template.
-- **`data_processor.py` uses `os.path.dirname(__file__)` for BASE path** — no hardcoded session paths.
-- **Never edit `view-config-bdr.json` without also re-running `build-map.py`** — the template reads it at runtime, but the build still validates it.
+- **Never edit `bdr-map.html` directly** — it's a build artifact. Edit the template, then run `python3 build-map.py`.
+- **Never edit `view-config-bdr.json` without rebuilding** — the map reads it at runtime but the build validates structure.
+- **`build-map.py` uses relative paths** — always run from the project root.
+- **Always update `REFACTOR.md`** after any change.
 
 ---
 
-## Build Pipeline
+## Data Pipeline
 
 ```
-5 Salesforce exports (XLSX)
-         ↓
-  data_processor.py       ← reads exports + geocode_master.csv for coords
-         ↓
-  accounts_data.json      ← standardized account records (standalone file)
-         ↓
-  python3 build-map.py    ← stamps version + timestamp into template
-         ↓
-  bdr-map.html (~70 KB)   ← push to GitHub (alongside accounts_data.json + view-config-bdr.json)
+SF accounts CSV  ──→  process_accounts.py  ──→  pipeline/accounts.csv
+SF opps CSV      ──→  process_pipeline.py  ──→  pipeline/pipeline.csv
+                                                         │
+                                               merge.py (joins on Account ID)
+                                                         │
+                                               accounts_data.json
+                                                         │
+                                               build-map.py
+                                                         │
+                                               bdr-map.html  →  push to GitHub
 ```
 
-### Template placeholders (substituted by build-map.py)
-- `%%DATA_VERSION%%` — latest ICP export filename suffix
-- `%%DATA_REFRESHED%%` — human-readable build timestamp (e.g. `Jun 1, 2026 · 9:00am`)
+### Step-by-step refresh
 
-`accounts_data.json` is **not** injected into the HTML anymore. The map fetches it at runtime
-via `fetch('accounts_data.json')`. This keeps `bdr-map.html` at ~70 KB instead of ~2 MB.
+```bash
+# 1. Process accounts (SF accounts report)
+python3 pipeline/process_accounts.py \
+    --accounts ~/Downloads/<accounts-report>.csv \
+    --geo      pipeline/geo/geo_lookup.json \
+    --output   pipeline/accounts.csv
 
-### Runtime fetches (on page load, in parallel)
-- `fetch('view-config-bdr.json')` → populates status colors/labels, roster, filter buttons, owner label
-- `fetch('accounts_data.json')` → populates the 17,500 account records
+# 2. Process pipeline (SF opportunities report)
+python3 pipeline/process_pipeline.py \
+    --input  ~/Downloads/<opps-report>.csv \
+    --output pipeline/pipeline.csv
+
+# 3. Merge into accounts_data.json
+python3 pipeline/merge.py \
+    --accounts pipeline/accounts.csv \
+    --pipeline pipeline/pipeline.csv \
+    --output   accounts_data.json
+
+# 4. Build the map
+python3 build-map.py
+
+# 5. Push to GitHub
+```
+
+### Salesforce report formats
+
+**Accounts report** — columns required:
+`Account ID, Account Name, Billing State/Province, Account Owner, Entity Type, Population, Account Tier, Account Status, Legacy Community Development Software, Starbridge Buyer ID`
+
+**Opportunities report** — columns required:
+`Account ID, Account Name, Opportunity Owner, Discovery Call Booked By, Discovery Call Date, Created Date, Stage, Annual Recurring Revenue (ARR), Closed Lost Stage Date, Closed Won Stage Date`
+
+Both reports export as CSV with latin-1 encoding (standard Salesforce export format).
 
 ---
 
-## Weekly Refresh — Two Paths
+## Status Codes
 
-### Path 1: Salesforce MCP (preferred)
+Defined in `view-config-bdr.json`. The map builds its marker colors, labels, and shapes from this file at runtime — no template changes needed to adjust a color or label.
 
-When Ali says "refresh the data from Salesforce", Claude runs these steps:
+| Code | Label | Color | Meaning |
+|---|---|---|---|
+| `cu` | Won / Customer | gold `#fbbf24` | Closed Won opp or active customer status |
+| `mf` | Mid Funnel | orange `#f97316` | Open opp — SQ, Demo, Proposal, or Verbal stage |
+| `tf` | Top Funnel | blue `#3b82f6` | Open opp — Initial Interest or Meeting Booked |
+| `cl` | Closed Lost | red `#ef4444` | Closed Lost opp, no open opp |
+| `u`  | *(no label)* | gray `#94a3b8` | No pipeline data — renders as neutral dot, no status shown in tooltip |
 
-**1. Run the 4 SOQL queries** from `sfdc-query-bdr.json` using `mcp__claude_ai_Salesforce_MCP_Read_Only__soqlQuery`:
-- `accounts` — all ICP accounts (~25k records)
-- `pipeline` — open opportunities
-- `customers` — accounts with active customer status
-- `activities` — latest task date per account (aggregate, ~8k rows)
+`u` is a silent fallback — it is **not** in `view-config-bdr.json`. It is hardcoded in the template JS after config loads. It means "no pipeline and no BDR activity on record."
 
-**2. Write all results to `sfdc_raw.json`** in this format:
-```json
-{
-  "refreshed": "2026-06-01T22:00:00Z",
-  "accounts":   [ ...Account records... ],
-  "pipeline":   [ ...Opportunity records... ],
-  "customers":  [ ...Account records... ],
-  "activities": [ ...{AccountId, expr0: "MAX(CreatedDate)"}... ]
-}
-```
-
-**3. Run `python3 data_processor.py`** — auto-detects `sfdc_raw.json` and uses it.
-
-**4. Run `python3 build-map.py`**, then `node smoke-test.js`, then push to GitHub.
-
-> `sfdc_raw.json` is gitignored — never committed. Delete it after a successful push to keep the repo clean.
-
-**Pagination:** If a query returns `"done": false`, the MCP tool handles it automatically. Verify `totalSize` on each result matches expected record counts.
-
----
-
-### Path 2: Excel Exports (fallback)
-
-If `sfdc_raw.json` does not exist, `data_processor.py` reads from Excel files in `All Data for Map/`. The processor picks the **latest file matching each glob**.
-
-| Pattern | Contents |
-|---|---|
-| `ICP Accounts by State_ARC-*.xlsx` | All ICP accounts: name, state, tier, owner, created date, **Account ID (18)** |
-| `AE Sales Pipeline_ARC-*.xlsx` | Open pipeline: stage, ARR, close date, account name |
-| `All Customers by State with*.xlsx` | Customers: name, state, legacy software, ARR |
-| `Meetings Booked by Cold Call per State-*.xlsx` | Cold-call meeting history |
-| `Activities by Account-*.xlsx` | BDR activity log with account name and date |
-
-The ICP export must include the **"Account ID (18)"** column for the `id` field to be populated.
-The processor detects it automatically; if absent, `id` is omitted gracefully (no crash).
+Signal → status code mapping (in `merge.py`):
+- `Won` → `cu`
+- `Mid Funnel` → `mf`
+- `Top Funnel` → `tf`
+- `Lost` → `cl`
+- No opp → `u`
 
 ---
 
@@ -164,94 +171,87 @@ Each account in `accounts_data.json`:
 
 ```json
 {
-  "a":   "Account Name",
-  "s":   "California",
-  "t":   "1",
-  "o":   "Lucy Nemerov",
-  "st":  "sq",
+  "a":   "City Of Cayce, SC",
+  "s":   "South Carolina",
+  "t":   "2",
+  "o":   "Hugh Bargeron",
+  "st":  "tf",
   "src": "bdr",
-  "id":  "001Hr000028Zd6FIAS",
-  "la":  37.4512,
-  "lo":  -122.0943,
-  "leg": "Accela",
-  "arr": 12000,
-  "ld":  "2026-02",
-  "n":   1
+  "id":  "001Hr000028ZbWl",
+  "la":  33.9657,
+  "lo":  -81.074,
+  "pop": 13739,
+  "leg": "CentralSquare - eTRAKIT",
+  "arr": 45000,
+  "pl":  1
 }
 ```
 
 | Field | Description |
 |---|---|
 | `a` | Account name |
-| `s` | State |
-| `t` | Tier ("1", "2", "3") |
+| `s` | State (full name) |
+| `t` | Tier ("S", "1", "2", "3") — read from Salesforce `Account_Tier__c`, not derived from population |
 | `o` | Owner (Salesforce account owner name) |
-| `st` | Status code (see Status Codes table) |
-| `src` | Data source team — `"bdr"` for all BDR records (enables multi-team joins) |
-| `id` | Salesforce Account ID (18-char) — universal join key across teams |
+| `st` | Status code (`cu`/`mf`/`tf`/`cl`/`u`) |
+| `src` | Data source team — `"bdr"` for all BDR records |
+| `id` | Salesforce Account ID (18-char) — primary join key |
 | `la` | Latitude |
 | `lo` | Longitude |
-| `leg` | Legacy software (omitted if none) |
-| `arr` | ARR in dollars (omitted if none) |
-| `ld` | Last touched month as `YYYY-MM` (omitted unless status = `t`) |
-| `n` | `1` if account was added to ICP on/after Mar 1 2026 (omitted otherwise) |
-
----
-
-## Status Codes
-
-Status codes and their visual properties are defined in `view-config-bdr.json`, not hardcoded in the template. The table below reflects the current BDR view config.
-
-| Code | Label | Color | Priority |
-|---|---|---|---|
-| `cu` | Customer | gold `#fbbf24` | 10 |
-| `vb` | Verbal | green `#22c55e` | 9 |
-| `pr` | Proposal | orange `#f97316` | 8 |
-| `dm` | Demo | purple `#c084fc` | 7 |
-| `sq` | Sales Qualified | cyan `#00e5ff` | 6 |
-| `mb` | Meeting Booked | blue `#3b82f6` | 5 |
-| `ii` | Initial Interest | yellow `#fde047` | 4 |
-| `cl` | Closed Lost | red `#ef4444` | 3 |
-| `t`  | Touched | sky blue `#38bdf8` | 2 |
-| `u`  | Untouched | slate `#cbd5e1` | 1 |
-
-To change a color or label, edit `view-config-bdr.json` — no template changes needed.
+| `pop` | Population (integer, omitted if blank) |
+| `leg` | Legacy software (omitted if none or "None Visible") |
+| `arr` | ARR in dollars as integer (omitted if none or placeholder $23k) |
+| `pl` | `1` if account has a Previously Lost flag (open opp + lost opp coexist) |
 
 ---
 
 ## View Config (view-config-bdr.json)
 
-This file externalizes all BDR-specific configuration from the map engine. A future AE or CS
-view gets its own `view-config-*.json` without touching the map template.
+Externalizes all BDR-specific config from the map engine.
 
 ```json
 {
-  "viewId":       "bdr",
-  "ownerLabel":   "BDR",
-  "statuses":     { "cu": { "label": "Customer", "color": "#fbbf24", "symbol": "star", "priority": 10 }, ... },
-  "statusGroups": { "pipeline": ["vb","pr","dm","sq","mb","ii"], "touched": [...], "pipelineFull": [...] },
-  "dotFilters":   [ { "id": "all", "label": "All" }, { "id": "customers", "label": "★ Customers" }, ... ],
-  "roster":       [ "Catherine Silvestri", "Nick Martino", ... ]
+  "viewId":   "bdr",
+  "ownerLabel": "BDR",
+  "statuses": {
+    "cu": { "label": "Won / Customer", "color": "#fbbf24", "symbol": "star",   "priority": 5 },
+    "mf": { "label": "Mid Funnel",     "color": "#f97316", "symbol": "circle", "priority": 4 },
+    "tf": { "label": "Top Funnel",     "color": "#3b82f6", "symbol": "circle", "priority": 3 },
+    "cl": { "label": "Closed Lost",    "color": "#ef4444", "symbol": "circle", "priority": 2 }
+  },
+  "roster": [ "Catherine Silvestri", "Nick Martino", ... ]
 }
 ```
 
-### What's driven by this config at runtime
-- Status colors, labels, and D3 marker symbols
-- Which statuses count as "pipeline", "touched", "pipelineFull"
-- The filter bar buttons (All / ★ Customers / ◆ Pipeline / ● Touched / ○ Untouched)
-- The owner pill row header label ("BDR")
-- The owner field label in the hover tooltip
-- The roster of team members shown as filter pills
+`symbol: "star"` renders as a D3 shaped `L.divIcon` marker. `symbol: "circle"` uses Leaflet's `circleMarker` (canvas renderer). Shapes are built dynamically from config — no template changes needed to add a new symbol.
+
+---
+
+## UI State (current)
+
+The map has been rebuilt from first principles. Things removed (will be rebuilt):
+- BDR rep pills / owner filter
+- Population filter bar
+- Legacy software filter bar
+- Tier filter
+- Sidebar panel (national + state views)
+- Account Status legend
+
+Things currently working:
+- **Visibility panel** (top-left): "All" toggle + multi-select state dropdown with search
+- **Table panel** (right-hand, toggleable via header button): Account, St, Owner, Tier, Pop
+- **Dot tooltip**: name, status badge (omitted for `u`), tier, state, population, legacy software, ARR
+- **Light/dark mode** toggle (header right), persists to localStorage
+- **Basemap toggle**: Dark / Light / Satellite / Off
+- **Search box**: free-text search over account names, flies to matched account
+- **Map click**: clicking a state selects it in the Visibility panel
 
 ---
 
 ## BDR Roster
 
-The roster lives in `view-config-bdr.json` under `"roster"`. To add or remove a BDR, edit
-that file and re-run `build-map.py` (the template reads it at runtime, but rebuilding keeps
-the repo in sync).
+Lives in `view-config-bdr.json` under `"roster"`. Edit there and rebuild.
 
-Current roster:
 ```
 Catherine Silvestri, Nick Martino, Ali Cohen, Ryan Minter, Alicia Gopal,
 Lucy Nemerov, Hugh Bargeron, Sydney Ireland, Emily Murnane, Ben Laddis,
@@ -260,89 +260,22 @@ Blake Anderson, Mihir Shah, Maia Golub
 
 ---
 
-## Weekly Refresh Workflow
-
-### With Salesforce MCP (preferred — say "refresh the data from Salesforce")
-1. Claude queries Salesforce via MCP (4 queries) → writes `sfdc_raw.json`
-2. Claude runs `python3 data_processor.py` → produces `accounts_data.json`
-3. Claude runs `python3 build-map.py` → writes `bdr-map.html`
-4. Claude runs `node smoke-test.js`
-5. Claude pushes `bdr-map.html` + `accounts_data.json` to GitHub
-6. Claude deletes `sfdc_raw.json` (gitignored, not needed after push)
-
-### With Excel exports (fallback — say "refresh the data from these exports")
-1. Ali downloads 5 new Salesforce exports into `All Data for Map/`
-2. Claude runs `data_processor.py` → produces `accounts_data.json`
-3. Run `python3 build-map.py` → writes `bdr-map.html`
-4. Run `node smoke-test.js`
-5. Push `bdr-map.html` + `accounts_data.json` to GitHub
-
----
-
 ## GitHub Deployment
 
 - **Repo:** https://github.com/acohenGW/govwell-state-of-territory
 - **Branch:** `main`
-- **Token:** stored locally only — never commit to repo. Needs `repo` scope. Regenerate at github.com/settings/tokens if expired.
-- Push uses the Git Data API: blob → tree → commit → ref update
-- **Files that must always be deployed together:** `bdr-map.html` + `accounts_data.json`
-- `view-config-bdr.json` must also be deployed if modified
+- **Files to deploy together:** `bdr-map.html` + `accounts_data.json` + `view-config-bdr.json` (if changed)
 
 ---
 
-## Phase Roadmap
+## What's Not Built Yet
 
-This project is being migrated from Cowork to Claude Code and expanded for org-wide use.
-
-### ✅ Phase 1 — Stabilize Infrastructure (complete)
-- [x] `data_processor.py` is permanent (not rewritten each session)
-- [x] `geocode_master.csv` exists (16,049+ rows) for coord persistence
-- [x] Dynamic BASE path in `data_processor.py` (no hardcoded session paths)
-- [x] Salesforce Account ID (`id` field, 18-char) added to all account records
-- [x] `src: "bdr"` field added to all account records (multi-team join key)
-- [x] `accounts_data.json` served as a standalone file (~2.5 MB); `bdr-map.html` is now ~70 KB
-- [x] View config externalized to `view-config-bdr.json` — map engine reads config at runtime
-- [x] `push-to-github` updated to push both `bdr-map.html` and `accounts_data.json` in one commit
-- [x] Full source repo pushed to GitHub (all source files, not just bdr-map.html)
-- [x] `data_processor.py` confirmed in the repo
-
-### Phase 2 — Replace CSV Exports with Salesforce MCP
-- Query Salesforce directly via `mcp__claude_ai_Salesforce_MCP_Read_Only__soqlQuery` (read-only, already connected)
-- 4 SOQL queries replace 5 manual Excel exports — eliminates Monday morning download ritual
-- Claude writes results to `sfdc_raw.json` (gitignored) → `data_processor.py` reads it → same pipeline as today
-- **MCP only runs on explicit refresh request** — never ambient
-
-**New files for Phase 2:**
-```
-sfdc-query-bdr.json     ← SOQL queries + field mappings for BDR view
-sfdc_raw.json           ← gitignored intermediate output from MCP queries
-```
-
-**Key Salesforce field mappings (BDR):**
-| Schema field | Salesforce API name |
+| Item | Notes |
 |---|---|
-| `a` (name) | `Name` |
-| `s` (state) | `BillingState` |
-| `t` (tier) | `Account_Tier__c` |
-| `o` (owner) | `Owner.Name` |
-| `pop` | `Population__c` |
-| `leg` | `Legacy_Community_Development_Soft_Pick__c` |
-| `id` | `Id` |
-| `arr` (pipeline) | `ARR_Formula__c` on Opportunity |
-| `arr` (customer) | `Current_ARR_Dlrs__c` on Account |
-
-**Multi-team extensibility:** Each future team (AE, CS, Marketing) gets its own `sfdc-query-{team}.json` with different SOQL queries and field mappings. The map engine and `data_processor.py` don't change.
-
-### Phase 3 — Add AE Pipeline Layer
-- Create `view-config-ae.json` with AE-specific statuses, roster, and filters
-- Add AE account data to the pipeline (new `src: "ae"` records)
-- Map engine already supports swappable view configs — no template changes needed
-- Leverage `id` field for clean cross-team joins
-
-### Phase 4 — Full GTM Data Model
-- Add CS (health, renewal, CSM owner) and Marketing layers via their own view configs
-- One map engine, multiple swappable data sources
-- Shared JSON schema: every department outputs the same format (`a`, `s`, `t`, `o`, `st`, `src`, `id`)
+| `process_customers.py` | Customer ARR from Salesforce customer records |
+| BDR rep owner filter | Removed — rebuilding |
+| Tier / population / legacy filters | Removed — rebuilding |
+| GitHub push | `accounts_data.json` + `bdr-map.html` + `view-config-bdr.json` need deploying |
 
 ---
 
@@ -351,8 +284,7 @@ sfdc_raw.json           ← gitignored intermediate output from MCP queries
 - **Map:** Leaflet.js v1.9.4 + D3.js v7 (CDN)
 - **Tiles:** CartoDB Dark/Light, Esri Satellite
 - **State boundaries:** us-atlas/states-10m.json via topojson
-- **Markers:** `L.canvas` for circles, `L.divIcon` with D3 SVG paths for pipeline shapes
-- **Data processing:** Python 3 + pandas
-- **Password gate:** `window.prompt()` at load, stored in `sessionStorage` key `gw_auth`
+- **Markers:** `L.circleMarker` (canvas) for circles; `L.divIcon` with D3 SVG paths for star (cu)
+- **Data processing:** Python 3 stdlib only (csv, json, pathlib) — no pandas
 - **Build:** Python string replace (no templating framework)
 - **Runtime data loading:** `fetch()` + `Promise.all` for parallel config + data loads

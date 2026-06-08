@@ -7,44 +7,95 @@
 <title>GovWell — Territory Dashboard</title>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#080808;color:#e2e8f0;height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
-/* ── Header ─────────────────────────────────────────────── */
-#header{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:46px;background:#0f0f0f;border-bottom:1px solid #222;flex-shrink:0;gap:10px}
-.logo{font-size:15px;font-weight:800;color:#fff;letter-spacing:-0.5px;white-space:nowrap}
-.logo span{color:#34d399}
-.subtitle{font-size:10px;color:#444;white-space:nowrap;padding-left:10px;border-left:1px solid #222}
+/* ── Design tokens ───────────────────────────────────────── */
+:root {
+  --bg:          #f0f2f5;
+  --surface:     #ffffff;
+  --surface-2:   #f6f6f6;
+  --surface-3:   #eeeeee;
+  --border:      #e0e0e0;
+  --border-sub:  #ebebeb;
+  --text:        #111111;
+  --text-muted:  #5e5e5e;
+  --text-faint:  #aaaaaa;
+  --map-bg:      #dde3ea;
+  --ctrl-bg:     rgba(255,255,255,0.96);
+  --ctrl-border: #d4d4d4;
+  --ctrl-hover:  rgba(0,0,0,0.05);
+  --tt-bg:       rgba(250,250,250,0.98);
+  --tt-border:   #e0e0e0;
+  --tt-text:     #111111;
+  --tt-val:      #0a0a0a;
+  --tt-row-bdr:  rgba(0,0,0,0.07);
+  --scroll:      #cccccc;
+  --state-stroke:#bbbbbb;
+}
+html.dark {
+  --bg:          #0d0d0d;
+  --surface:     #161616;
+  --surface-2:   #1d1d1d;
+  --surface-3:   #252525;
+  --border:      #303030;
+  --border-sub:  #272727;
+  --text:        #f0f4f8;
+  --text-muted:  #a0aab4;
+  --text-faint:  #606874;
+  --map-bg:      #111318;
+  --ctrl-bg:     rgba(20,20,22,0.97);
+  --ctrl-border: #383838;
+  --ctrl-hover:  rgba(255,255,255,0.09);
+  --tt-bg:       rgba(20,20,22,0.98);
+  --tt-border:   #3d3d3d;
+  --tt-text:     #ffffff;
+  --tt-val:      #f0f4f8;
+  --tt-row-bdr:  rgba(255,255,255,0.10);
+  --scroll:      #3a3a3a;
+  --state-stroke:#2a2a2a;
+}
+
+body{font-family:'DM Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Header (always dark) ────────────────────────────────── */
+#header{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:46px;background:#0a0a0a;border-bottom:1px solid #222;flex-shrink:0;gap:10px}
+.header-logo{height:18px;width:auto;flex-shrink:0}
+.header-divider{width:1px;height:14px;background:rgba(255,255,255,0.12);margin:0 2px}
+.subtitle{font-size:10px;color:#555;white-space:nowrap;padding-left:10px;border-left:1px solid #2a2a2a}
 .date-chip{font-size:9px;padding:2px 7px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#888;white-space:nowrap}
 .header-left{display:flex;align-items:center;gap:10px}
+.header-right{display:flex;align-items:center;gap:6px;min-width:0}
+.theme-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;transition:border-color .15s,color .15s,background .15s;flex-shrink:0}
+.theme-toggle:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.06)}
+.icon-sun{display:none}
+.icon-moon{display:block}
+html.dark .icon-sun{display:block}
+html.dark .icon-moon{display:none}
 
-/* ── BDR Pills ──────────────────────────────────────────── */
-.bdr-row{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-.bdr-row::-webkit-scrollbar{display:none}
-.pill-lbl{font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;padding-right:2px}
-.bdr-pill{font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid #222;cursor:pointer;color:#555;background:transparent;transition:all .12s;white-space:nowrap;font-weight:500;font-family:inherit}
-.bdr-pill:hover{color:#e2e8f0;border-color:#444}
-.bdr-pill.active{background:#1a3060;border-color:#3b82f6;color:#60a5fa;font-weight:600}
 
 /* ── Body ───────────────────────────────────────────────── */
 #body{display:flex;flex:1;overflow:hidden;min-height:0}
-#mapWrap{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-height:400px}
-#map{position:absolute;inset:0;width:100%;height:100%;background:#0a0a0a}
-#mapStatus{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:13px;z-index:999;text-align:center;padding:20px;background:rgba(0,0,0,.8);border:1px solid #333;border-radius:10px;display:none}
+#mapWrap{flex:1;position:relative;overflow:hidden;background:var(--map-bg);min-height:400px}
+#map{position:absolute;inset:0;width:100%;height:100%;background:var(--map-bg)}
+#mapStatus{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-muted);font-size:13px;z-index:999;text-align:center;padding:20px;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:10px;display:none}
 #mapStatus.visible{display:block}
 #mapStatus .status-title{color:#fbbf24;font-weight:700;margin-bottom:8px;font-size:14px}
-#mapStatus .status-detail{color:#666;font-size:11px;line-height:1.5;margin-top:6px;font-family:ui-monospace,monospace}
+#mapStatus .status-detail{color:var(--text-faint);font-size:11px;line-height:1.5;margin-top:6px;font-family:ui-monospace,monospace}
 
-/* Tone down Leaflet default UI for dark theme */
-.leaflet-control-attribution{background:rgba(0,0,0,0.6) !important;color:#555 !important;font-size:9px !important;border-radius:6px 0 0 0 !important;padding:2px 6px !important}
-.leaflet-control-attribution a{color:#777 !important}
-.leaflet-bar{border:1px solid #333 !important;box-shadow:0 2px 10px rgba(0,0,0,.6) !important}
-.leaflet-bar a{background:#111 !important;color:#ccc !important;border-bottom-color:#333 !important;font-weight:600 !important}
-.leaflet-bar a:hover{background:#222 !important;color:#fff !important}
+/* Leaflet UI */
+html.dark .leaflet-tile-pane{filter:brightness(1.35)}
+.leaflet-control-attribution{background:var(--ctrl-bg) !important;color:var(--text-faint) !important;font-size:9px !important;border-radius:6px 0 0 0 !important;padding:2px 6px !important}
+.leaflet-control-attribution a{color:var(--text-muted) !important}
+.leaflet-bar{border:1px solid var(--ctrl-border) !important;box-shadow:0 2px 10px rgba(0,0,0,.15) !important}
+.leaflet-bar a{background:var(--surface) !important;color:var(--text) !important;border-bottom-color:var(--border) !important;font-weight:600 !important}
+.leaflet-bar a:hover{background:var(--surface-2) !important;color:var(--text) !important}
 
 /* ── State boundaries (overlay) ─────────────────────────── */
-.state-path{stroke:#111;stroke-width:0.8;cursor:pointer;transition:filter .12s}
+.state-path{stroke:var(--state-stroke);stroke-width:0.8;cursor:pointer;transition:filter .12s}
 .state-path:hover{filter:brightness(1.7)}
 .state-path.selected{stroke:#fff !important;stroke-width:1.5 !important;filter:brightness(1.3)}
 
@@ -52,209 +103,402 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .dots-overlay{position:absolute;pointer-events:none;will-change:transform}
 .dots-overlay path.dot{pointer-events:auto;cursor:pointer;transition:filter .1s}
 .dots-overlay path.dot:hover{filter:brightness(1.6) drop-shadow(0 0 4px white)}
-.dots-overlay text.dot-label{font-family:'Inter',sans-serif;font-size:10px;pointer-events:none;dominant-baseline:middle;paint-order:stroke;stroke:rgba(0,0,0,.75);stroke-width:2px;stroke-linejoin:round}
+.dots-overlay text.dot-label{font-family:'DM Sans',sans-serif;font-size:10px;pointer-events:none;dominant-baseline:middle;paint-order:stroke;stroke:rgba(0,0,0,.75);stroke-width:2px;stroke-linejoin:round}
 
-/* ── Back / zoom controls ───────────────────────────────── */
-#backBtn{position:absolute;top:10px;left:10px;background:#111;border:1px solid #444;border-radius:7px;color:#ccc;font-size:11px;font-weight:600;padding:5px 12px;cursor:pointer;display:none;z-index:1000;font-family:inherit;transition:all .12s}
-#backBtn.visible{display:block}
-#backBtn:hover{background:#222;color:#fff;border-color:#888}
+/* ── Map controls column (top-left overlay) ─────────────── */
+#mapControls{position:absolute;top:10px;left:10px;z-index:1000;display:flex;flex-direction:column;gap:6px}
 
-/* ── Dot filter toggle ──────────────────────────────────── */
-/* Filter toggle bar — visible at all zoom levels (national + state). */
-#dotToggle{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #333;border-radius:24px;padding:4px;gap:3px;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.8)}
-.dt-btn{font-size:11px;padding:5px 16px;border-radius:18px;border:none;cursor:pointer;font-weight:700;font-family:inherit;color:#777;background:transparent;transition:all .15s;white-space:nowrap;letter-spacing:.01em}
-.dt-btn:hover{color:#ddd;background:#1e1e1e}
-.dt-btn.active-all{background:#2a2a2a;color:#fff}
-.dt-btn.active-customers{background:#78350f;color:#fde68a;box-shadow:0 0 12px rgba(251,191,36,.5)}
-.dt-btn.active-pipeline{background:#92400e;color:#fed7aa;box-shadow:0 0 12px rgba(251,146,60,.3)}
-.dt-btn.active-touched{background:#0369a1;color:#fff;box-shadow:0 0 12px rgba(56,189,248,.5)}
-.dt-btn.active-untouched{background:#334155;color:#e2e8f0;box-shadow:0 0 12px rgba(226,232,240,.3)}
+/* ── Visibility panel ───────────────────────────────────── */
+#visibilityPanel{background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:10px;padding:10px 12px;min-width:165px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
 
-/* ── Population filter toggle ───────────────────────────── */
-#popToggle{position:absolute;top:54px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #222;border-radius:20px;padding:3px 5px;gap:2px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.7);white-space:nowrap}
-.pop-sep{width:1px;height:16px;background:#2a2a2a;margin:0 3px;flex-shrink:0}
-.pop-btn{font-size:10px;padding:3px 9px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-family:inherit;color:#555;background:transparent;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:4px}
-.pop-btn:hover{color:#ddd;background:#1a1a1a}
-.pop-btn .pop-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;opacity:.65}
-.pop-btn.pop-active{color:#fff;background:rgba(255,255,255,.08);box-shadow:0 0 8px rgba(255,255,255,.1)}
-.pop-btn.pop-active .pop-dot{opacity:1}
+/* ── Show table bar ─────────────────────────────────────── */
+#showTableBar{border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.stb-btn{width:100%;padding:9px 14px;font-size:12px;font-weight:700;font-family:inherit;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;color:var(--text-muted);cursor:pointer;text-align:left;transition:all .15s;white-space:nowrap;letter-spacing:.01em}
+.stb-btn:hover{color:var(--text);border-color:var(--text-muted);background:var(--surface-2)}
+.stb-btn.active{background:rgba(254,175,14,0.1);border-color:#FEAF0E;color:#FEAF0E}
+.vp-label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);font-weight:700;margin-bottom:8px}
+.vp-btn{width:100%;font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--ctrl-border);background:transparent;color:var(--text-muted);cursor:pointer;font-family:inherit;font-weight:600;text-align:left;transition:all .12s;margin-bottom:6px;display:block}
+.vp-btn:hover{color:var(--text);background:var(--ctrl-hover)}
+.vp-btn.active{background:var(--surface-3);color:var(--text);border-color:var(--text-muted)}
+.vp-divider{height:1px;background:var(--border);margin-bottom:6px}
+#vp-state-wrap{position:relative}
+.vp-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--ctrl-border);background:transparent;color:var(--text-muted);cursor:pointer;font-family:inherit;font-weight:500;transition:all .12s}
+.vp-trigger:hover{color:var(--text);background:var(--ctrl-hover)}
+.vp-trigger.open{border-color:var(--text-muted);color:var(--text)}
+.vp-chevron{width:9px;height:9px;flex-shrink:0;transition:transform .15s;opacity:.5}
+.vp-trigger.open .vp-chevron{transform:rotate(180deg);opacity:1}
+.vp-dropdown{position:fixed;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:1010;overflow:hidden;display:none;width:210px}
+.vp-dropdown.open{display:block}
+.vp-search{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:7px 10px;font-size:11px;font-family:inherit;outline:none}
+.vp-search::placeholder{color:var(--text-faint)}
+.vp-list{max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.vp-list::-webkit-scrollbar{width:3px}
+.vp-list::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:2px}
+.vp-item{display:flex;align-items:center;gap:7px;padding:5px 10px;font-size:11px;cursor:pointer;color:var(--text-muted);transition:background .08s;user-select:none}
+.vp-item:hover{background:var(--ctrl-hover);color:var(--text)}
+.vp-item.selected{color:var(--text);background:rgba(254,175,14,0.07)}
+.vp-check{width:12px;height:12px;border-radius:3px;border:1px solid var(--ctrl-border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .1s}
+.vp-item.selected .vp-check{background:#FEAF0E;border-color:#FEAF0E}
+.vp-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+#vp-clear{display:none;width:100%;margin-top:6px;padding:4px 0;font-size:10px;font-weight:600;font-family:inherit;color:var(--text-faint);background:transparent;border:none;cursor:pointer;text-align:center;transition:color .12s}
+#vp-clear:hover{color:#ef4444}
+#vp-clear.visible{display:block}
 
-/* ── Legacy software filter toggle ─────────────────────── */
-#legToggle{position:absolute;top:94px;left:50%;transform:translateX(-50%);display:flex;z-index:1000;background:#111;border:1px solid #222;border-radius:20px;padding:3px 6px;gap:2px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.7);white-space:nowrap}
-.leg-btn{font-size:10px;padding:3px 9px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-family:inherit;color:#555;background:transparent;transition:all .15s;white-space:nowrap}
-.leg-btn:hover{color:#ddd;background:#1a1a1a}
-.leg-btn.leg-active{color:#fff;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c}
 
 /* ── Tooltip ────────────────────────────────────────────── */
-/* Mouse-following tooltip div (restored from pre-Leaflet map — matches the
-   old hover feel the user preferred). */
-#tooltip{position:fixed;background:rgba(10,10,10,0.97);border:1px solid #333;border-radius:10px;padding:11px 14px;font-size:11px;pointer-events:none;display:none;z-index:2000;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.9)}
-/* Dot icon cursor */
+#tooltip{position:fixed;background:var(--tt-bg);border:1px solid var(--tt-border);border-radius:10px;padding:11px 14px;font-size:11px;pointer-events:none;display:none;z-index:2000;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.15)}
 .gw-dot-icon{cursor:pointer}
+.dot-pulse-ring{width:32px;height:32px;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 0 0 2px rgba(0,0,0,0.4);animation:dot-pulse 0.9s ease-out 2 forwards;opacity:0;pointer-events:none}
+@keyframes dot-pulse{0%{transform:scale(0.4);opacity:1}100%{transform:scale(2.2);opacity:0}}
 .gw-dot-icon svg{overflow:visible}
-.tt-name{font-weight:700;color:#fff;margin-bottom:7px;font-size:12px;line-height:1.3}
-.tt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2.5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:10.5px;color:#666}
+.tt-name{font-weight:700;color:var(--tt-text);margin-bottom:7px;font-size:12px;line-height:1.3}
+.tt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2.5px 0;border-bottom:1px solid var(--tt-row-bdr);font-size:10.5px;color:var(--text-muted)}
 .tt-row:last-child{border-bottom:none}
-.tt-val{color:#e2e8f0;font-weight:600;text-align:right;max-width:150px}
+.tt-val{color:var(--tt-val);font-weight:600;text-align:right;max-width:150px}
 .tt-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:8px;font-size:9.5px;font-weight:700}
-.tt-new{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.35);color:#34d399}
+.tt-new{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(254,175,14,0.12);border:1px solid rgba(254,175,14,0.35);color:#FEAF0E}
 
-#stateTip{position:fixed;background:rgba(10,10,10,0.96);border:1px solid #333;border-radius:8px;padding:9px 12px;font-size:11px;pointer-events:none;display:none;z-index:1500;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,.8)}
-#filterTip{position:fixed;background:rgba(10,10,10,0.97);border:1px solid #1e3a5f;border-radius:8px;padding:10px 13px;font-size:11px;pointer-events:none;display:none;z-index:2100;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,.9)}
+#stateTip{position:fixed;background:var(--tt-bg);border:1px solid var(--tt-border);border-radius:8px;padding:9px 12px;font-size:11px;pointer-events:none;display:none;z-index:1500;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,.12)}
 
-/* ── Legend ─────────────────────────────────────────────── */
-#legend{position:absolute;bottom:14px;right:14px;background:rgba(10,10,10,.95);border:1px solid #222;border-radius:10px;padding:11px 14px;min-width:155px;z-index:1000}
-.leg-title{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#444;margin-bottom:9px;font-weight:700}
-.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:10px;color:#777}
-.leg-row:last-child{margin-bottom:0}
-.leg-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.leg-cnt{margin-left:auto;font-size:9px;color:#444;font-weight:600}
+
+/* ── BDM Pages bar ──────────────────────────────────────── */
+#bdmPagesBar{background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;padding:0;box-shadow:0 4px 16px rgba(0,0,0,.12);overflow:visible;position:relative}
+#bdmPagesDropdown{display:none;position:absolute;top:calc(100% + 3px);left:0;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:1010;min-width:165px;overflow:hidden}
+#bdmPagesDropdown.open{display:block}
+.bdm-rep-link{display:block;padding:6px 12px;font-size:11px;color:var(--text-muted);text-decoration:none;transition:background .08s,color .08s;white-space:nowrap;font-weight:500}
+.bdm-rep-link:hover{background:var(--ctrl-hover);color:var(--text)}
+
+/* ── Status hot bar ─────────────────────────────────────── */
+#hotbar-container{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;align-items:center;gap:5px;white-space:nowrap}
+#status-hotbar,#pipeline-subbar,#pop-hotbar,#activity-hotbar{display:flex;align-items:center;gap:2px;background:rgba(8,8,8,0.82);border:1px solid rgba(255,255,255,0.11);border-radius:999px;padding:3px;backdrop-filter:blur(10px);box-shadow:0 4px 24px rgba(0,0,0,.5)}
+html:not(.dark) #status-hotbar,html:not(.dark) #pipeline-subbar,html:not(.dark) #pop-hotbar,html:not(.dark) #activity-hotbar{background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.12);box-shadow:0 4px 20px rgba(0,0,0,.15)}
+#pipeline-subbar{display:none}
+#pipeline-subbar.open{display:flex}
+#pop-hotbar{gap:3px}
+.hotbar-sep{width:1px;height:16px;background:rgba(255,255,255,0.15);margin:0 2px;flex-shrink:0}
+html:not(.dark) .hotbar-sep{background:rgba(0,0,0,0.12)}
+.shb-sub{font-size:8px;opacity:.55;font-weight:400;margin-left:1px}
+.shb-range-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);padding:0 2px;user-select:none}
+html:not(.dark) .shb-range-lbl{color:rgba(0,0,0,0.35)}
+.shb-input{width:58px;font-size:10px;font-family:inherit;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.75);outline:none;transition:border-color .12s}
+.shb-input:focus{border-color:rgba(255,255,255,0.4);color:rgba(255,255,255,0.95)}
+.shb-input::placeholder{color:rgba(255,255,255,0.25)}
+.shb-input.has-val{border-color:#FEAF0E;color:#FEAF0E}
+html:not(.dark) .shb-input{background:rgba(0,0,0,0.05);border-color:rgba(0,0,0,0.18);color:rgba(0,0,0,0.7)}
+html:not(.dark) .shb-input:focus{border-color:rgba(0,0,0,0.4);color:rgba(0,0,0,0.9)}
+html:not(.dark) .shb-input::placeholder{color:rgba(0,0,0,0.25)}
+html:not(.dark) .shb-input.has-val{border-color:#FEAF0E;color:#c87c00}
+.shb-btn{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:999px;border:none;background:transparent;color:rgba(255,255,255,0.45);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;white-space:nowrap;transition:all .15s;line-height:1}
+html:not(.dark) .shb-btn{color:rgba(0,0,0,0.45)}
+.shb-btn:hover{color:rgba(255,255,255,0.85);background:rgba(255,255,255,0.08)}
+html:not(.dark) .shb-btn:hover{color:rgba(0,0,0,0.8);background:rgba(0,0,0,0.06)}
+.shb-btn.active{background:rgba(255,255,255,0.13);color:var(--shb-color,rgba(255,255,255,0.95))}
+html:not(.dark) .shb-btn.active{background:rgba(0,0,0,0.08);color:var(--shb-color,rgba(0,0,0,0.85))}
+#pipeline-subbar .shb-btn{font-size:10px;padding:4px 12px}
+
+/* ── Rep relationship filter bar ────────────────────────── */
+#repFilterBar{display:none;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:10px;padding:10px 12px;min-width:165px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.rf-btn{width:100%;font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--ctrl-border);background:transparent;color:var(--text-muted);cursor:pointer;font-family:inherit;font-weight:600;text-align:left;transition:all .12s;margin-bottom:6px;display:block}
+.rf-btn:last-child{margin-bottom:0}
+.rf-btn:hover{color:var(--text);background:var(--ctrl-hover)}
+.rf-btn.active.owned{background:rgba(254,175,14,0.12);border-color:#FEAF0E;color:#FEAF0E}
+.rf-btn.active.calledin{background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#38bdf8}
+
+/* ── Header dropdowns (position:fixed, placed via JS below trigger) */
+#vp-rep-dropdown,#state-dash-dropdown{position:fixed;background:#161616;border:1px solid rgba(255,255,255,0.12);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:9999;overflow:hidden;display:none;width:220px}
+#vp-rep-dropdown.open,#state-dash-dropdown.open{display:block}
+/* ── Competitor dropdown (anchored to hotbar-container) */
+#comp-dropdown{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(255,255,255,0.12);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:1010;overflow:hidden;display:none;width:260px}
+#comp-dropdown.open{display:block}
+
+/* ── Header team controls ────────────────────────────────── */
+#teamControls{display:flex;align-items:center;gap:3px}
+.team-hdr-btn{font-size:11px;font-weight:600;font-family:inherit;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;transition:all .12s;white-space:nowrap}
+.team-hdr-btn:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.06)}
+.team-hdr-btn.active{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.4);color:#fff}
+
+/* Dashboard button in header */
+#header-dash-btn{display:none;align-items:center;gap:5px;font-size:10px;font-weight:700;font-family:inherit;color:#000;background:#FEAF0E;border:none;border-radius:999px;padding:4px 12px;cursor:pointer;text-decoration:none;transition:background .12s;white-space:nowrap;flex-shrink:0}
+#header-dash-btn:hover{background:#fbbf24}
+#header-dash-btn.visible{display:inline-flex}
+
+/* ── Color mode panel ───────────────────────────────────── */
+#colorModePanel{background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:10px;padding:10px 12px;min-width:165px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.cm-pill{font-size:10px;font-weight:700;font-family:inherit;padding:3px 9px;border-radius:20px;border:1px solid var(--ctrl-border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s;white-space:nowrap}
+.cm-pill:hover{border-color:var(--text-muted);color:var(--text)}
+.cm-pill.active{background:#FEAF0E;border-color:#FEAF0E;color:#000}
+
+/* ── Owner / Pod legend ─────────────────────────────────── */
+#ownerLegend{position:absolute;bottom:52px;right:10px;z-index:1000;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:10px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,.2);min-width:160px;max-height:calc(100vh - 120px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.leg-section{margin-bottom:8px}
+.leg-section:last-child{margin-bottom:0}
+.leg-section-title{font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;color:var(--text-faint);margin-bottom:5px}
+.leg-row{display:flex;align-items:center;gap:7px;padding:2px 0;font-size:11px;color:var(--text-muted)}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.leg-name{white-space:nowrap}
+
+/* ── Table panel (left third) ───────────────────────────── */
+#tablePanel{width:42%;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .2s ease}
+#tablePanel.hidden{width:0;border-right:none}
+#tablePanel.hidden *{visibility:hidden}
+#tableHead{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface-2)}
+.table-head-label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);font-weight:700}
+#tableCount{font-size:11px;font-weight:700;color:var(--text)}
+#tableWrap{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+#tableWrap::-webkit-scrollbar{width:3px}
+#tableWrap::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:2px}
+#accountTable{width:100%;border-collapse:collapse;font-size:11px}
+#accountTable thead{position:sticky;top:0;z-index:2;background:var(--surface-2)}
+#accountTable th{padding:6px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap}
+#accountTable td{padding:5px 8px;border-bottom:1px solid var(--border-sub);color:var(--text-muted);vertical-align:middle}
+#accountTable tbody tr[data-id]{cursor:pointer}
+#accountTable tbody tr:hover td{background:var(--ctrl-hover);color:var(--text)}
+#accountTable tr.act-detail:hover td{background:var(--surface-2) !important}
+#accountTable th.sortable{cursor:pointer;user-select:none}
+#accountTable th.sortable:hover{color:var(--text)}
+#accountTable th.sorted-asc::after{content:' \2191';color:#FEAF0E}
+#accountTable th.sorted-desc::after{content:' \2193';color:#FEAF0E}
+.col-name{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--text) !important}
+.col-st{width:26px;color:var(--text-faint) !important;font-weight:600;font-size:10px}
+.col-owner{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.col-tier{width:30px;text-align:center}
+.col-pop{width:55px;text-align:right;font-variant-numeric:tabular-nums}
+.col-calls{width:36px;text-align:right;font-variant-numeric:tabular-nums}
+.col-last{width:60px;white-space:nowrap;font-size:10px}
+.col-exp{width:18px;padding:0 3px !important;text-align:center}
+.col-stage{width:72px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-competitor{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text-muted)}
+.st-dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
+.st-star{font-size:11px;line-height:1;vertical-align:middle}
+.tier-badge{display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700}
+.exp-btn{background:transparent;border:none;cursor:pointer;color:var(--text-faint);font-size:9px;padding:2px 4px;border-radius:3px;transition:color .1s,transform .15s;line-height:1}
+.exp-btn:hover{color:var(--text)}
+.exp-btn.open{transform:rotate(90deg);color:#FEAF0E}
+.act-detail td{background:var(--surface-2) !important;padding:8px 12px !important}
+.rep-breakdown{display:flex;flex-wrap:wrap;gap:5px}
+.rep-chip{font-size:10px;padding:2px 8px;border-radius:12px;background:var(--surface-3);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap}
+.rep-chip strong{color:var(--text);font-weight:600}
+.rep-back-link{font-size:10px;color:#555;text-decoration:none;padding:3px 8px;border:1px solid #2a2a2a;border-radius:5px;white-space:nowrap;transition:color .12s,border-color .12s}
+.rep-back-link:hover{color:#aaa;border-color:#444}
+#clearFiltersBtn{font-size:11px;font-weight:700;font-family:inherit;color:#fff;background:#dc2626;border:none;border-radius:6px;padding:5px 13px;cursor:pointer;white-space:nowrap;transition:background .12s,opacity .12s,box-shadow .12s;opacity:0.28;pointer-events:none}
+#clearFiltersBtn.active{opacity:1;pointer-events:auto;box-shadow:0 0 0 2px rgba(220,38,38,0.35)}
+#clearFiltersBtn.active:hover{background:#ef4444}
+.dash-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;font-family:inherit;color:#000;background:#FEAF0E;border:none;border-radius:6px;padding:5px 13px;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background .12s,transform .1s;flex-shrink:0}
+.dash-btn:hover{background:#fbbf24;transform:translateY(-1px)}
+.dash-divider{width:1px;height:18px;background:rgba(255,255,255,0.15);margin:0 2px;flex-shrink:0}
+.rep-mode-chip{font-size:9px;padding:2px 8px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#aaa;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.table-section-hdr td{padding:6px 10px !important;border-top:2px solid var(--border) !important;border-bottom:1px solid var(--border) !important;border-left:3px solid transparent}
+.table-section-hdr.owned  td{background:rgba(254,175,14,0.07) !important;border-left-color:#FEAF0E !important}
+.table-section-hdr.calledin td{background:rgba(56,189,248,0.07) !important;border-left-color:#38bdf8 !important}
+.tsh-label{font-size:9px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;color:var(--text-muted)}
+.tsh-count{font-size:10px;font-weight:700;color:var(--text-faint);margin-left:8px}
+
+/* ── Table pagination bar ────────────────────────────────── */
+#tablePager{display:none;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);background:var(--surface-2);flex-shrink:0}
+.pg-btn{background:transparent;border:1px solid var(--ctrl-border);border-radius:5px;color:var(--text-muted);cursor:pointer;font-family:inherit;font-size:14px;line-height:1;padding:1px 8px;transition:all .12s}
+.pg-btn:hover:not(:disabled){color:var(--text);border-color:var(--text-muted)}
+.pg-btn:disabled{opacity:.3;cursor:default}
+#pagerInfo{font-size:10px;color:var(--text-faint);font-weight:600}
+.act-expand{display:flex;flex-direction:row;align-items:flex-start;gap:16px;padding:2px 0}
+.act-expand-main{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.act-tools{display:flex;flex-direction:column;gap:5px;flex-shrink:0;align-items:flex-end}
+.act-tool-link{display:inline-flex;align-items:center;text-decoration:none;opacity:0.75;transition:opacity .15s}
+.act-tool-link:hover{opacity:1}
+.act-tool-link img{display:block;width:auto}
+.act-tool-link.sf{padding:0}
+.act-tool-link.sf img{height:20px}
+.act-tool-link.sb{background:#fff;border-radius:5px;padding:2px 7px}
+.act-tool-link.sb img{height:16px}
+.act-block-label{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);font-weight:700;margin-bottom:4px}
+.contact-group{margin-bottom:6px}
+.contact-group-head{font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.contact-group-count{font-weight:400;color:var(--text-faint)}
+.contact-row{display:flex;align-items:baseline;gap:6px;font-size:10px;padding:2px 0;border-bottom:1px solid var(--border-sub)}
+.contact-row:last-child{border-bottom:none}
+.contact-name{font-weight:600;color:var(--text);min-width:120px}
+.contact-title{color:var(--text-muted);flex:1}
+.contact-last{color:var(--text-faint);font-size:9px;white-space:nowrap}
 
 /* ── Basemap style toggle — bottom-left, beside zoom controls ─────── */
-#basemapToggle{position:absolute;bottom:10px;left:46px;display:flex;gap:3px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:3px}
+#basemapToggle{position:absolute;bottom:10px;left:46px;display:flex;gap:3px;z-index:1000;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;padding:3px}
 
 /* ── Last-refreshed chip (bottom-left, above basemap toggle) ─────── */
-#refreshedChip{position:absolute;bottom:48px;left:46px;z-index:1000;background:rgba(10,10,10,.9);border:1px solid #222;border-radius:8px;padding:4px 10px;font-size:9px;color:#888;letter-spacing:.2px;white-space:nowrap;pointer-events:none}
-#refreshedChip .rc-lbl{color:#555;text-transform:uppercase;letter-spacing:.5px;font-size:8px;margin-right:4px}
-#refreshedChip .rc-val{color:#cbd5e1;font-weight:600}
+#refreshedChip{position:absolute;bottom:48px;left:46px;z-index:1000;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;padding:4px 10px;font-size:9px;color:var(--text-muted);letter-spacing:.2px;white-space:nowrap;pointer-events:none}
+#refreshedChip .rc-lbl{color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;font-size:8px;margin-right:4px}
+#refreshedChip .rc-val{color:var(--text);font-weight:600}
 /* ── Search box — bottom-left, above refreshed chip, dropdown opens upward ── */
 #searchBox{position:absolute;bottom:82px;left:46px;z-index:1100;width:260px}
-#searchInput{width:100%;background:rgba(10,10,10,.95);border:1px solid #333;border-radius:8px;padding:7px 11px 7px 28px;font-size:11px;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color .12s;box-shadow:0 4px 16px rgba(0,0,0,.6)}
-#searchInput::placeholder{color:#555}
+#searchInput{width:100%;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;padding:7px 11px 7px 28px;font-size:11px;color:var(--text);font-family:inherit;outline:none;transition:border-color .12s;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+#searchInput::placeholder{color:var(--text-faint)}
 #searchInput:focus{border-color:#60a5fa}
-#searchBox::before{content:"⌕";position:absolute;left:9px;top:7px;color:#555;font-size:14px;pointer-events:none}
-#searchResults{display:none;position:absolute;bottom:100%;left:0;right:0;margin-bottom:4px;background:rgba(10,10,10,.97);border:1px solid #333;border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;box-shadow:0 -8px 28px rgba(0,0,0,.8)}
+#searchBox::before{content:"⌕";position:absolute;left:9px;top:7px;color:var(--text-faint);font-size:14px;pointer-events:none}
+#searchResults{display:none;position:absolute;bottom:100%;left:0;right:0;margin-bottom:4px;background:var(--ctrl-bg);border:1px solid var(--ctrl-border);border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;box-shadow:0 -8px 28px rgba(0,0,0,.12)}
 #searchResults.visible{display:block}
 #searchResults::-webkit-scrollbar{width:4px}
-#searchResults::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
-.sr-row{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;transition:background .08s}
+#searchResults::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:2px}
+.sr-row{padding:7px 11px;border-bottom:1px solid var(--border-sub);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;transition:background .08s}
 .sr-row:last-child{border-bottom:none}
 .sr-row:hover,.sr-row.focus{background:rgba(96,165,250,.12)}
-.sr-name{font-size:11px;color:#e2e8f0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.sr-meta{font-size:9px;color:#666;display:flex;gap:5px;align-items:center;flex-shrink:0}
+.sr-name{font-size:11px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sr-meta{font-size:9px;color:var(--text-muted);display:flex;gap:5px;align-items:center;flex-shrink:0}
 .sr-st{padding:1px 5px;border-radius:7px;font-size:8px;font-weight:700}
-.sr-empty{padding:10px 12px;color:#555;font-size:10px;text-align:center;font-style:italic}
-.sr-hint{padding:8px 11px;color:#444;font-size:9px;border-top:1px solid rgba(255,255,255,.04);background:rgba(0,0,0,.3)}
+.sr-empty{padding:10px 12px;color:var(--text-faint);font-size:10px;text-align:center;font-style:italic}
+.sr-hint{padding:8px 11px;color:var(--text-faint);font-size:9px;border-top:1px solid var(--border-sub);background:var(--surface-2)}
 
-.bm-btn{font-size:9px;padding:4px 9px;border-radius:5px;border:none;cursor:pointer;font-weight:700;font-family:inherit;color:#666;background:transparent;transition:all .12s;text-transform:uppercase;letter-spacing:.4px}
-.bm-btn:hover{color:#ccc}
+.bm-btn{font-size:9px;padding:4px 9px;border-radius:5px;border:none;cursor:pointer;font-weight:700;font-family:inherit;color:var(--text-muted);background:transparent;transition:all .12s;text-transform:uppercase;letter-spacing:.4px}
+.bm-btn:hover{color:var(--text)}
 .bm-btn.active{background:#1e3a5f;color:#bfdbfe}
 
-/* ── Side Panel ─────────────────────────────────────────── */
-#panel{width:315px;background:#0f0f0f;border-left:1px solid #1e1e1e;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
-#panelEmpty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;text-align:center}
-.empty-icon{font-size:30px;opacity:.1;color:#888}
-.empty-text{font-size:12px;color:#333;line-height:1.7}
-#panelContent{flex:1;overflow-y:auto;display:none}
-#panelContent.visible{display:block}
-#panelContent::-webkit-scrollbar{width:3px}
-#panelContent::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
-
-.ph{padding:13px 14px 10px;background:#111;border-bottom:1px solid #1e1e1e;position:sticky;top:0;z-index:5}
-.ph-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.5px}
-.ph-meta{font-size:10px;color:#444;margin-top:2px}
-.ph-toggle{display:flex;gap:3px;margin-top:9px}
-.pht-btn{flex:1;font-size:10px;padding:5px 0;border-radius:6px;border:1px solid #222;cursor:pointer;font-weight:700;font-family:inherit;color:#666;background:transparent;transition:all .12s;text-align:center}
-.pht-btn:hover{color:#ddd;border-color:#444}
-.pht-btn.pa{background:#2a2a2a;border-color:#555;color:#fff}
-.pht-btn.pt{background:#0369a1;border-color:#38bdf8;color:#e0f2fe}
-.pht-btn.pc{background:#78350f;border-color:#fbbf24;color:#fef3c7}
-.pht-btn.pp{background:#92400e;border-color:#fb923c;color:#ffedd5}
-.pht-btn.pu{background:#1e293b;border-color:#94a3b8;color:#e2e8f0}
-.tier-toggle{display:flex;gap:3px;margin-top:5px}
-.tier-btn{flex:1;font-size:10px;padding:4px 0;border-radius:5px;border:1px solid #222;cursor:pointer;font-weight:800;font-family:inherit;color:#555;background:transparent;transition:all .12s;text-align:center;letter-spacing:.3px}
-.tier-btn:hover{color:#ddd;border-color:#444}
-.tier-btn.t1a{background:#166534;border-color:#4ade80;color:#bbf7d0}
-.tier-btn.t2a{background:#1e3a5f;border-color:#60a5fa;color:#bfdbfe}
-.tier-btn.t3a{background:#3b1764;border-color:#c084fc;color:#e9d5ff}
-.tier-btn.talla{background:#2a2a2a;border-color:#555;color:#fff}
-.tier-btn.tsa{background:#7c2d12;border-color:#fb923c;color:#fed7aa}
-.ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:9px}
-.ph-stat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 3px;text-align:center}
-.ph-sv{font-size:14px;font-weight:800;color:#fff;line-height:1}
-.ph-sl{font-size:7.5px;color:#444;text-transform:uppercase;letter-spacing:.3px;margin-top:3px}
-
-.ps{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,0.05)}
-.ps-title{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#555;font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:6px}
-.ps-badge{padding:1px 6px;border-radius:8px;font-size:8px;font-weight:700;text-transform:none;letter-spacing:0}
-.pr{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
-.pr:last-child{border-bottom:none}
-.pr-lbl{display:flex;align-items:center;gap:6px;font-size:11px;color:#777}
-.pr-val{font-weight:700;color:#e2e8f0;font-size:11px}
-
-.leg-cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
-.leg-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:7px;padding:8px 9px}
-.lc-val{font-size:18px;font-weight:800;line-height:1}
-.lc-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-top:2px}
-.lc-sub{font-size:9px;color:#555;margin-top:3px}
-.bar-wrap{background:#1a1a1a;border-radius:3px;height:4px;margin-top:3px;overflow:hidden}
-.bar-fill{height:100%;border-radius:3px;transition:width .3s}
-.bar-row{margin-bottom:5px}
-.bar-row:last-child{margin-bottom:0}
-.bar-hdr{display:flex;justify-content:space-between;margin-bottom:2px;font-size:9.5px}
-.bar-lbl{color:#555}
-.bar-pct{font-weight:700}
-
-.acct-row{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
-.acct-row:last-child{border-bottom:none}
-.acct-name{font-size:10.5px;color:#ccc;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.acct-sub{font-size:9px;color:#444;margin-top:1px;display:flex;align-items:center;gap:5px}
-.tb{display:inline-block;padding:0 4px;border-radius:3px;font-size:8px;font-weight:700}
-.t1b{background:rgba(34,197,94,.15);color:#4ade80}
-.t2b{background:rgba(251,146,60,.15);color:#fb923c}
-.t3b{background:rgba(168,85,247,.15);color:#c084fc}
-.more-row{font-size:9px;color:#333;padding:3px 0}
 </style>
 </head>
 <body>
 
 <div id="header">
   <div class="header-left">
-    <div class="logo">Gov<span>Well</span></div>
+    <svg class="header-logo" viewBox="0 0 1372 348" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="GovWell">
+      <g clip-path="url(#clip0_242_3668)">
+        <path d="M1126.48 176.396H1042V261H1126.48V176.396Z" fill="white"/>
+        <path d="M1287 176.395C1233.5 145.936 1179.99 206.855 1126.48 176.395V91.7908C1179.99 122.25 1233.5 61.3317 1287 91.7908C1287 119.992 1287 148.194 1287 176.395Z" fill="white"/>
+      </g>
+      <path d="M127.514 252.793C114.592 245.004 104.595 234.228 97.5594 220.476C90.5113 206.725 87 191.135 87 173.744C87 156.354 90.5624 140.764 97.6871 127C104.812 113.248 114.924 102.472 128.025 94.683C141.112 86.8943 156.281 83 173.518 83C192.083 83 207.495 87.2263 219.752 95.6789C232.022 104.132 241.05 115.649 246.846 130.23H215.27C211.619 123.105 206.358 117.474 199.489 113.325C192.607 109.188 183.95 107.107 173.505 107.107C161.235 107.107 150.752 110.171 142.057 116.3C133.362 122.429 126.773 130.562 122.292 140.662C117.81 150.774 115.575 161.793 115.575 173.732C115.575 185.67 117.81 196.689 122.292 206.801C126.761 216.914 133.349 224.996 142.057 231.036C150.752 237.088 161.235 240.114 173.505 240.114C183.452 240.114 192.032 238.122 199.233 234.151C206.435 230.18 212.04 224.537 216.011 217.246C219.995 209.955 222.14 201.426 222.472 191.645H172.254V167.526H249.821V260.76H228.192L225.702 241.365C220.39 248.324 213.304 253.916 204.443 258.143C195.569 262.369 184.933 264.476 172.497 264.476C155.425 264.476 140.423 260.582 127.501 252.793H127.514Z" fill="white"/>
+      <path d="M297.434 255.538C287.321 249.575 279.494 241.365 273.94 230.921C268.386 220.476 265.615 208.883 265.615 196.114C265.615 183.346 268.386 171.753 273.94 161.308C279.494 150.864 287.321 142.666 297.434 136.691C307.546 130.728 319.229 127.74 332.496 127.74C345.762 127.74 357.228 130.728 367.43 136.691C377.632 142.654 385.497 150.864 391.051 161.308C396.605 171.753 399.376 183.346 399.376 196.114C399.376 208.883 396.605 220.476 391.051 230.921C385.497 241.365 377.619 249.563 367.43 255.538C357.241 261.514 345.596 264.489 332.496 264.489C319.395 264.489 307.546 261.501 297.434 255.538ZM354.125 235.773C360.088 231.547 364.57 225.916 367.545 218.868C370.532 211.819 372.014 204.248 372.014 196.114C372.014 187.981 370.52 180.409 367.545 173.361C364.557 166.313 360.088 160.644 354.125 156.328C348.162 152.026 340.948 149.868 332.496 149.868C324.043 149.868 316.829 152.026 310.866 156.328C304.903 160.644 300.422 166.313 297.434 173.361C294.446 180.409 292.965 187.994 292.965 196.114C292.965 204.235 294.459 211.819 297.434 218.868C300.422 225.916 304.891 231.547 310.866 235.773C316.829 239.999 324.043 242.106 332.496 242.106C340.948 242.106 348.162 239.999 354.125 235.773Z" fill="white"/>
+      <path d="M395.24 131.481H424.326L443.964 184.687C447.769 195.131 452.582 210.466 458.379 230.678H459.375C464.508 212.279 469.398 196.957 474.046 184.687L493.441 131.481H522.782L472.565 260.76H445.215L395.253 131.481H395.24Z" fill="white"/>
+      <path d="M518.773 86.7286H547.361L571.225 174.485C573.549 183.104 575.618 191.429 577.443 199.473C579.269 207.517 580.929 215.586 582.41 223.707H583.406C586.726 205.806 590.531 189.322 594.847 174.23L619.464 86.7158H648.052L672.669 174.23C676.972 189.143 680.867 205.64 684.352 223.707H685.348C686.995 214.922 688.668 206.597 690.315 198.719C691.962 190.854 693.954 182.772 696.278 174.485L720.142 86.7286H748.73L699.01 260.748H670.422L644.822 170.003C641.17 157.082 637.697 141.747 634.377 124.012H633.381C630.393 140.087 626.831 155.422 622.694 170.003L597.094 260.748H568.506L518.786 86.7286H518.773Z" fill="white"/>
+      <path d="M765.635 255.538C755.689 249.575 747.989 241.416 742.512 231.049C737.047 220.694 734.302 209.049 734.302 196.114C734.302 183.18 737.034 171.753 742.512 161.308C747.989 150.864 755.689 142.666 765.635 136.691C775.582 130.728 786.933 127.74 799.701 127.74C814.946 127.74 827.587 131.43 837.61 138.81C847.633 146.19 854.796 156.175 859.112 168.765C860.759 173.578 861.934 178.673 862.585 184.048C863.249 189.437 863.581 195.527 863.581 202.32V206.304H762.647C762.979 212.432 764.677 218.319 767.742 223.949C770.806 229.58 775.109 234.19 780.663 237.752C786.218 241.314 792.806 243.102 800.429 243.102C809.047 243.102 815.917 241.199 821.062 237.382C826.195 233.577 829.681 229.095 831.507 223.962H861.091C857.273 235.901 850.148 245.63 839.717 253.176C829.272 260.722 816.185 264.489 800.441 264.489C787.175 264.489 775.582 261.501 765.635 255.538ZM830.894 167.156C828.162 161.768 824.139 157.427 818.841 154.107C813.529 150.787 807.158 149.14 799.701 149.14C792.244 149.14 786.32 150.8 780.932 154.107C775.543 157.427 771.317 161.768 768.253 167.156C765.188 172.544 763.324 178.469 762.66 184.93H835.503C835.171 178.469 833.639 172.544 830.907 167.156H830.894Z" fill="white"/>
+      <path d="M879.924 86.7285H907.274V260.748H879.924V86.7285Z" fill="white"/>
+      <path d="M930.461 86.7285H957.811V260.748H930.461V86.7285Z" fill="white"/>
+      <defs>
+        <clipPath id="clip0_242_3668">
+          <rect width="245" height="178" fill="white" transform="translate(1042 83)"/>
+        </clipPath>
+      </defs>
+    </svg>
+    <div class="header-divider"></div>
     <div class="subtitle">Territory Dashboard</div>
+    <a id="header-dash-btn" href="#">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
     <div id="dataDate" class="date-chip"></div>
   </div>
-  <div class="bdr-row" id="bdrRow">
-    <span class="pill-lbl"></span>
-    <!-- Pills rendered dynamically from data + view config -->
+  <div class="header-right">
+    <button class="team-hdr-btn" id="state-dash-trigger" onclick="toggleStateDashDropdown()">
+      State Dashboards
+      <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:8px;height:8px;opacity:.5;flex-shrink:0"><path d="M1 1l4 4 4-4"/></svg>
+    </button>
+    <div id="teamControls">
+      <button class="team-hdr-btn active" id="team-all-btn" onclick="clearTeam()">All</button>
+      <div id="teamPods" style="display:contents"></div>
+      <button class="team-hdr-btn" id="vp-rep-trigger" onclick="toggleRepDropdown()">
+        <span id="vp-rep-label">View by Rep…</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:8px;height:8px;opacity:.5;flex-shrink:0"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+    </div>
+    <button id="clearFiltersBtn" onclick="clearFilters()">Clear Filters</button>
+    <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+      <svg class="icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
   </div>
 </div>
 
 <div id="body">
+
+  <div id="tablePanel" class="hidden">
+    <div id="tableHead">
+      <span class="table-head-label">Accounts &nbsp;<span id="tableCount"></span></span>
+    </div>
+    <div id="tableWrap">
+      <table id="accountTable">
+        <thead>
+          <tr>
+            <th class="col-exp"></th>
+            <th class="col-name sortable" data-sort="name">Account</th>
+            <th class="col-st sortable"   data-sort="st">St</th>
+            <th class="col-owner sortable" data-sort="owner">Owner</th>
+            <th class="col-stage sortable" data-sort="stage">Stage</th>
+            <th class="col-tier sortable" data-sort="tier">Tier</th>
+            <th class="col-pop sortable"  data-sort="pop">Pop</th>
+            <th class="col-calls sortable" data-sort="calls">Calls</th>
+            <th class="col-last sortable" data-sort="last">Last Call</th>
+            <th class="col-competitor sortable" data-sort="competitor">Competitor</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div id="tablePager">
+      <button class="pg-btn" id="pagerPrev" onclick="prevPage()">&#8249;</button>
+      <span id="pagerInfo"></span>
+      <button class="pg-btn" id="pagerNext" onclick="nextPage()">&#8250;</button>
+    </div>
+  </div>
+
   <div id="mapWrap">
     <div id="map"></div>
 
-    <button id="backBtn" onclick="resetView()">← US</button>
-
-    <div id="dotToggle">
-      <!-- Filter buttons built dynamically from view config -->
+    <div id="hotbar-container">
+      <div id="status-hotbar">
+        <button class="shb-btn active" data-code="all">All</button>
+        <button class="shb-btn" data-code="cu"       style="--shb-color:#fbbf24">&#9733; Customers</button>
+        <button class="shb-btn" data-code="pipeline" style="--shb-color:#f97316">&#9670; Pipeline</button>
+        <button class="shb-btn" data-code="t"        style="--shb-color:#38bdf8">&#9679; Touched</button>
+        <button class="shb-btn" data-code="u"        style="--shb-color:#94a3b8">&#9675; Untouched</button>
+      </div>
+      <div id="pipeline-subbar">
+        <button class="shb-btn active" data-pipe="all">All</button>
+        <button class="shb-btn" data-pipe="mf"   style="--shb-color:#f97316">&#9679; Mid Funnel</button>
+        <button class="shb-btn" data-pipe="tf"   style="--shb-color:#3b82f6">&#9679; Top Funnel</button>
+        <button class="shb-btn" data-pipe="lost" style="--shb-color:#ef4444">&#9679; Lost</button>
+      </div>
+      <div id="pop-hotbar">
+        <button class="shb-btn" data-pop="s" style="--shb-color:#fbbf24">Tier S<span class="shb-sub">≥50k</span></button>
+        <button class="shb-btn" data-pop="1" style="--shb-color:#4ade80">T1<span class="shb-sub">25–50k</span></button>
+        <button class="shb-btn" data-pop="2" style="--shb-color:#60a5fa">T2<span class="shb-sub">10–25k</span></button>
+        <button class="shb-btn" data-pop="3" style="--shb-color:#94a3b8">T3<span class="shb-sub">&lt;10k</span></button>
+        <div class="hotbar-sep"></div>
+        <span class="shb-range-lbl">&gt;</span>
+        <input class="shb-input" id="pop-min" type="number" min="0" placeholder="min pop">
+        <span class="shb-range-lbl">&lt;</span>
+        <input class="shb-input" id="pop-max" type="number" min="0" placeholder="max pop">
+      </div>
+      <div id="activity-hotbar">
+        <button class="shb-btn" data-act="30d"   style="--shb-color:#38bdf8">Last Month</button>
+        <button class="shb-btn" data-act="90d"   style="--shb-color:#38bdf8">Last Quarter</button>
+        <button class="shb-btn" data-act="1y"    style="--shb-color:#38bdf8">Last Year</button>
+        <button class="shb-btn" data-act="never" style="--shb-color:#94a3b8">1Yr+ / Never</button>
+        <div class="hotbar-sep"></div>
+        <button class="shb-btn" id="comp-trigger" onclick="toggleCompDropdown()" style="--shb-color:#fb923c">
+          <span id="comp-label">Competitor…</span>
+          <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:8px;height:8px;opacity:.5;flex-shrink:0"><path d="M1 1l4 4 4-4"/></svg>
+        </button>
+      </div>
+      <div id="comp-dropdown">
+        <input id="comp-search" class="vp-search" placeholder="Search competitors…" oninput="_filterCompList(this.value)" autocomplete="off">
+        <div id="comp-list" class="vp-list"></div>
+      </div>
     </div>
 
-    <div id="popToggle">
-      <button class="pop-btn" id="pop-co-150k" onclick="setPopFilter('co-150k')"><span class="pop-dot" style="background:#64748b"></span>County &gt;150k</button>
-      <button class="pop-btn" id="pop-co-50k"  onclick="setPopFilter('co-50k')"><span class="pop-dot" style="background:#94a3b8"></span>50k–150k</button>
-      <button class="pop-btn" id="pop-co-25k"  onclick="setPopFilter('co-25k')"><span class="pop-dot" style="background:#a37c52"></span>25–50k</button>
-      <button class="pop-btn" id="pop-co-sm"   onclick="setPopFilter('co-sm')"><span class="pop-dot" style="background:#475569"></span>&lt;25k</button>
-      <div class="pop-sep"></div>
-      <button class="pop-btn" id="pop-ci-100k" onclick="setPopFilter('ci-100k')"><span class="pop-dot" style="background:#9333ea"></span>City &gt;100k</button>
-      <button class="pop-btn" id="pop-ci-50k"  onclick="setPopFilter('ci-50k')"><span class="pop-dot" style="background:#3b82f6"></span>50–100k</button>
-      <button class="pop-btn" id="pop-ci-25k"  onclick="setPopFilter('ci-25k')"><span class="pop-dot" style="background:#16a34a"></span>25–50k</button>
-      <button class="pop-btn" id="pop-ci-15k"  onclick="setPopFilter('ci-15k')"><span class="pop-dot" style="background:#ca8a04"></span>15–25k</button>
-      <button class="pop-btn" id="pop-ci-10k"  onclick="setPopFilter('ci-10k')"><span class="pop-dot" style="background:#be185d"></span>10–15k</button>
-      <button class="pop-btn" id="pop-ci-sm"   onclick="setPopFilter('ci-sm')"><span class="pop-dot" style="background:#dc2626"></span>&lt;10k</button>
+    <div id="mapControls">
+      <div id="repFilterBar">
+        <div class="vp-label">Show</div>
+        <button class="rf-btn" id="rfOwned" onclick="toggleRepFilter('owned')">Owned Accounts Only</button>
+        <button class="rf-btn" id="rfCi" onclick="toggleRepFilter('calledin')">Called-In Accounts</button>
+      </div>
+      <div id="showTableBar">
+        <button class="stb-btn" id="stbBtn" onclick="toggleTable()">Show Table</button>
+      </div>
+      <div id="colorModePanel">
+        <div class="vp-label">Color by</div>
+        <div class="bdmf-row">
+          <button class="cm-pill active" data-mode="stage">Stage</button>
+          <button class="cm-pill" data-mode="owner">Owner</button>
+          <button class="cm-pill" data-mode="pod">Pod</button>
+        </div>
+      </div>
     </div>
 
-    <div id="legToggle">
-      <button class="leg-btn" id="leg-iworq"     onclick="setLegFilter('iworq')">iWorQ</button>
-      <button class="leg-btn" id="leg-tyler"      onclick="setLegFilter('tyler')">Tyler</button>
-      <button class="leg-btn" id="leg-opengov"    onclick="setLegFilter('opengov')">OpenGov</button>
-      <button class="leg-btn" id="leg-mygov"      onclick="setLegFilter('mygov')">MyGov</button>
-      <button class="leg-btn" id="leg-citizenserve" onclick="setLegFilter('citizenserve')">CitizenServe</button>
-      <button class="leg-btn" id="leg-granicus"   onclick="setLegFilter('granicus')">Granicus</button>
-      <button class="leg-btn" id="leg-accela"     onclick="setLegFilter('accela')">Accela</button>
-      <button class="leg-btn" id="leg-cloudpermit" onclick="setLegFilter('cloudpermit')">Cloudpermit</button>
-      <button class="leg-btn" id="leg-mgo"        onclick="setLegFilter('mgo')">MGO</button>
-    </div>
+    <div id="ownerLegend" style="display:none"></div>
 
     <div id="basemapToggle">
       <button class="bm-btn active" data-bm="dark"  onclick="setBasemap('dark')">Dark</button>
@@ -270,42 +514,16 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <div id="searchResults"></div>
     </div>
 
-    <div id="legend"></div>
-
   </div>
 
-  <div id="panel">
-    <div id="panelEmpty">
-      <div class="empty-icon">◎</div>
-      <div class="empty-text">Click any state to explore accounts, pipeline, and coverage data</div>
-    </div>
-    <div id="panelContent"></div>
-  </div>
 </div>
 
 <div id="tooltip"></div>
-<div id="stateTip"></div>
-<div id="filterTip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════════════════
-// Password gate
-// ═══════════════════════════════════════════════════════════════════
-(function(){
-  const KEY='gw_auth', PW='Permitplease';
-  if(sessionStorage.getItem(KEY)==='1') return;
-  const tries = 3;
-  for(let i=0;i<tries;i++){
-    const p = window.prompt('Territory Dashboard — enter password:');
-    if(p===null){ document.body.innerHTML='<div style="color:#555;padding:40px;font-family:sans-serif">Access canceled.</div>'; throw new Error('canceled'); }
-    if(p===PW){ sessionStorage.setItem(KEY,'1'); return; }
-  }
-  document.body.innerHTML='<div style="color:#555;padding:40px;font-family:sans-serif">Too many attempts.</div>';
-  throw new Error('pw-fail');
-})();
 
 // ═══════════════════════════════════════════════════════════════════
 // WEEKLY DATA — replace ACCOUNTS every Monday
@@ -316,16 +534,33 @@ let ACCOUNTS = [];   // populated at runtime via fetch('accounts_data.json')
 // END WEEKLY DATA
 // ═══════════════════════════════════════════════════════════════════
 
+// Rep-filtered view — set when ?rep= is in the URL
+const REP_FILTER = new URLSearchParams(window.location.search).get('rep') || null;
+
+if(REP_FILTER){
+  document.querySelector('.subtitle').textContent = REP_FILTER + "'s View";
+  const hdrRight = document.querySelector('.header-right');
+  const back = document.createElement('a');
+  back.href = 'bdr-map.html';
+  back.className = 'rep-back-link';
+  back.textContent = '← All Accounts';
+  hdrRight.prepend(back);
+  const chip = document.getElementById('dataDate');
+  if(chip){ chip.className = 'rep-mode-chip'; chip.textContent = REP_FILTER; }
+  const div1 = document.createElement('div'); div1.className = 'dash-divider';
+  const dashA = document.createElement('a');
+  dashA.href = 'rep-dashboard.html?rep=' + encodeURIComponent(REP_FILTER);
+  dashA.className = 'dash-btn';
+  dashA.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard';
+  document.querySelector('.header-left').append(div1, dashA);
+}
+
+
 // ── Visual config — populated at runtime from view-config-bdr.json ─
 let STATUS_COLORS    = {};
 let STATUS_LABELS    = {};
 let STATUS_ORDER     = [];
-let PIPELINE_ST      = new Set();
-let TOUCHED_ST       = new Set();
-let PIPELINE_FULL    = new Set();
 let SYM_TYPE         = {};
-let OWNER_ROSTER     = new Set();
-let VIEW_OWNER_LABEL = 'Owner';
 const DOT_R = 7.5;
 const CUST_R = 11;
 
@@ -355,85 +590,100 @@ const FIPS = {
   "53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
 };
 
-// ── Per-state stats — populated after accounts_data.json loads ────
-const byState = {};
-function _computeByState(){
-  ACCOUNTS.forEach(a => {
-    if(!a.s||!ABBR[a.s]) return;
-    if(!byState[a.s]) byState[a.s]={
-      total:0,touched:0,pipeline:0,customers:0,untouched:0,
-      vb:0,pr:0,dm:0,sq:0,mb:0,ii:0,cl:0,custArr:0,
-    };
-    const s=byState[a.s];
-    const tch = TOUCHED_ST.has(a.st);
-    s.total++;
-    if(tch) s.touched++; else s.untouched++;
-    if(PIPELINE_ST.has(a.st)) s.pipeline++;
-    if(a.st==='cu'){ s.customers++; s.custArr+=(a.arr||0); }
-    if(s[a.st]!==undefined) s[a.st]++;
-  });
-}
 
 // ── App state ─────────────────────────────────────────────────────
-let activeBdr    = '';
 let currentState = null;
 // Default: no dots shown. User picks a filter (or BDR, or state) to reveal accounts.
-let dotFilter    = 'none';
-let activeTier   = 0;
+let visibilityMode   = 'all'; // 'all' | 'states'
+const PAGE_SIZE = 500;
+let currentPage = 0;
+let _totalTablePages = 1;
+let repRelFilter    = null; // null | 'owned' | 'calledin' — only active in rep mode
+let hotbarActive    = 'all'; // 'all' | 'cu' | 'pipeline' | 't' | 'u'
+let selectedPipelineTypes = new Set(); // 'mf' | 'tf' | 'lost' — empty = All
+let selectedPopTiers = new Set(); // 's' | '1' | '2' | '3'
+let popMin = null, popMax = null;
+
+const POP_TIER_RANGES = { s:[50000,Infinity], '1':[25000,49999], '2':[10000,24999], '3':[0,9999] };
+let colorMode     = 'stage';   // 'stage' | 'owner' | 'pod'
+let selectedPod = null; // null | pod name
+let selectedRep = null; // null | single rep name
+let PODS          = {};        // populated from view-config
+let OWNER_COLORS  = {};        // populated from view-config
+let tableSort = { col: null, dir: 1 }; // col: string key, dir: 1=asc -1=desc
+
+const _TIER_SORT = { 'S': 0, '1': 1, '2': 2, '3': 3 };
+
+function _sortAccounts(arr, col, dir){
+  return [...arr].sort((a, b) => {
+    let va, vb, cmp;
+    switch(col){
+      case 'name':  return dir * (a.a || '').localeCompare(b.a || '');
+      case 'st':    return dir * (a.s || '').localeCompare(b.s || '');
+      case 'owner': return dir * (a.o || '').localeCompare(b.o || '');
+      case 'tier':
+        va = _TIER_SORT[a.t] ?? 99; vb = _TIER_SORT[b.t] ?? 99;
+        return dir * (va - vb);
+      case 'pop':
+        if(a.pop == null && b.pop == null) return 0;
+        if(a.pop == null) return 1; if(b.pop == null) return -1;
+        return dir * (a.pop - b.pop);
+      case 'calls':
+        if(a.tc == null && b.tc == null) return 0;
+        if(a.tc == null) return 1; if(b.tc == null) return -1;
+        return dir * (a.tc - b.tc);
+      case 'last':
+        if(!a.lcd && !b.lcd) return 0;
+        if(!a.lcd) return 1; if(!b.lcd) return -1;
+        return dir * a.lcd.localeCompare(b.lcd);
+      case 'stage':      return dir * (STATUS_LABELS[a.st]||'').localeCompare(STATUS_LABELS[b.st]||'');
+      case 'competitor': return dir * (a.leg||'').localeCompare(b.leg||'');
+    }
+    return 0;
+  });
+}
+
+function _applyTableSort(all){
+  if(!tableSort.col) return all;
+  if(REP_FILTER){
+    const owned = _sortAccounts(all.filter(a => a._rel === 'owned'), tableSort.col, tableSort.dir);
+    const ci    = _sortAccounts(all.filter(a => a._rel === 'calledin'), tableSort.col, tableSort.dir);
+    return [...owned, ...ci];
+  }
+  return _sortAccounts(all, tableSort.col, tableSort.dir);
+}
+
+function _updateSortHeaders(){
+  document.querySelectorAll('#accountTable th[data-sort]').forEach(th => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if(th.dataset.sort === tableSort.col){
+      th.classList.add(tableSort.dir === 1 ? 'sorted-asc' : 'sorted-desc');
+    }
+  });
+}
+let selectedActivity = null; // null | '30d' | '90d' | '1y' | 'never'
+
+// Activity filter thresholds — computed once at page load
+const _FILTER_NOW = Date.now();
+const _MS_30D  = 30  * 86400000;
+const _MS_90D  = 90  * 86400000;
+const _MS_365D = 365 * 86400000;
+function _lcdAge(lcd){
+  if(!lcd) return Infinity;
+  const p = lcd.split('-');
+  return _FILTER_NOW - new Date(+p[0], +p[1] - 1, +p[2]).getTime();
+}
+const ACTIVITY_OPTIONS = [
+  { id: '30d',   label: 'Last 30 Days',  test: a => _lcdAge(a.lcd) <= _MS_30D  },
+  { id: '90d',   label: 'Last Quarter',  test: a => _lcdAge(a.lcd) <= _MS_90D  },
+  { id: '1y',    label: 'Last Year',     test: a => _lcdAge(a.lcd) <= _MS_365D },
+  { id: 'never', label: 'Never / 1 yr+', test: a => _lcdAge(a.lcd) >  _MS_365D },
+];
+let selectedStates   = new Set();
+let selectedStatuses = new Set();
+const stateLayers    = {};
 let currentBasemap = 'dark';
 
-// ── Owner pills — roster populated from view config ───────────────
-// Salesforce exports include AEs and other non-roster owners — filter so the
-// pill row only shows the current team. Non-roster accounts still appear on
-// the map; they just don't get a pill.
-function buildPills(){
-  const counts = {};
-  ACCOUNTS.forEach(a => { if(a.o) counts[a.o] = (counts[a.o]||0)+1; });
-  // Always show every roster member as a pill, even with 0 accounts —
-  // new reps need a button before any accounts have been reassigned to them.
-  const owners = Array.from(OWNER_ROSTER)
-    .map(name => [name, counts[name] || 0])
-    .sort((a,b) => b[1]-a[1])
-    .map(([name]) => name);
-  const row = document.getElementById('bdrRow');
-  const allBtn = document.createElement('button');
-  allBtn.className = 'bdr-pill active';
-  allBtn.dataset.bdr = '';
-  allBtn.textContent = 'All';
-  row.appendChild(allBtn);
-  owners.forEach(name => {
-    const b = document.createElement('button');
-    b.className = 'bdr-pill';
-    b.dataset.bdr = name;
-    b.textContent = name.split(' ')[0];
-    b.title = name;
-    row.appendChild(b);
-  });
-  document.querySelectorAll('.bdr-pill').forEach(b=>
-    b.addEventListener('click',()=>{
-      const bdrVal = b.dataset.bdr;
-      if(bdrVal === ''){
-        activeBdr = '';
-        document.querySelectorAll('.bdr-pill').forEach(x=>x.classList.toggle('active',x===b));
-      } else {
-        const isActive = b.classList.contains('active');
-        activeBdr = isActive ? '' : bdrVal;
-        const allPill = document.querySelector('.bdr-pill[data-bdr=""]');
-        document.querySelectorAll('.bdr-pill').forEach(x=>{
-          if(x===b) x.classList.toggle('active',!isActive);
-          else if(x===allPill) x.classList.toggle('active', isActive);
-          else x.classList.remove('active');
-        });
-      }
-      // Picking a BDR is a narrowing gesture — if no filter is set yet, surface
-      // the whole territory so they see something on the map.
-      if(activeBdr && dotFilter === 'none') setDotFilter('all');
-      renderDots();
-      updateChoro();
-      renderPanel(currentState || null);
-    })
-  );
-}
 
 // ── View config loader ────────────────────────────────────────────
 const _D3_SYMBOLS = {
@@ -453,103 +703,714 @@ function _applyViewConfig(cfg){
   // renderDots uses STATUS_ORDER.indexOf() to sort markers — higher index =
   // lower priority = rendered first (underneath).
   STATUS_ORDER  = [...codes].sort((a,b) => cfg.statuses[b].priority - cfg.statuses[a].priority);
-  PIPELINE_ST   = new Set(cfg.statusGroups.pipeline);
-  TOUCHED_ST    = new Set(cfg.statusGroups.touched);
-  PIPELINE_FULL = new Set(cfg.statusGroups.pipelineFull);
-  OWNER_ROSTER  = new Set(cfg.roster);
-  ICONS = {
-    cu: symbolIcon('cu', CUST_R, '#78350f', 1),
-    vb: symbolIcon('vb', DOT_R+1, '#14532d', 0.6),
-    pr: symbolIcon('pr', DOT_R+1, '#7c2d12', 0.6),
-    dm: symbolIcon('dm', DOT_R,   '#581c87', 0.6),
-    sq: symbolIcon('sq', DOT_R+1, '#164e63', 0.6),
-    mb: symbolIcon('mb', DOT_R,   '#1e3a8a', 0.5),
-    ii: symbolIcon('ii', DOT_R,   '#713f12', 0.5),
-  };
-  SHAPED = new Set(Object.keys(ICONS));
-  VIEW_OWNER_LABEL = cfg.ownerLabel || 'Owner';
-  const pillLbl = document.querySelector('.pill-lbl');
-  if(pillLbl) pillLbl.textContent = cfg.ownerLabel;
-  _buildDotFilterButtons(cfg.dotFilters);
-}
-function _buildDotFilterButtons(filters){
-  const bar = document.getElementById('dotToggle');
-  bar.innerHTML = '';
-  filters.forEach(f => {
-    const b = document.createElement('button');
-    b.className = 'dt-btn';
-    b.id = 'dt-' + f.id;
-    b.textContent = f.label;
-    b.onclick = () => setDotFilter(f.id);
-    if(f.showTip){
-      b.addEventListener('mouseenter', e => showFilterTip(e, f.id));
-      b.addEventListener('mouseleave', hideFilterTip);
+  const SHAPED_STROKES = { cu:'#78350f' };
+  ICONS = {};
+  codes.forEach(st => {
+    const s = cfg.statuses[st];
+    if(s.symbol && s.symbol !== 'circle'){
+      const r = st === 'cu' ? CUST_R : DOT_R;
+      ICONS[st] = symbolIcon(st, r, SHAPED_STROKES[st] || '#333', 0);
     }
-    bar.appendChild(b);
+  });
+  SHAPED = new Set(Object.keys(ICONS));
+  // Silent fallback for accounts with no pipeline data yet.
+  // 'u' is not in view-config (not a meaningful status until activity is layered in)
+  // but these accounts still render as a neutral gray dot with no label.
+  STATUS_COLORS['u'] = STATUS_COLORS['u'] || '#94a3b8';
+  STATUS_LABELS['u'] = STATUS_LABELS['u'] || '';
+  _buildStateList();
+  _buildActivityList();
+  _buildBdmDropdown(cfg.roster || []);
+  _buildTeamHotbar(cfg);
+}
+
+function _buildBdmDropdown(roster){
+  const dd = document.getElementById('bdmPagesDropdown');
+  if(!dd) return;
+  dd.innerHTML = '';
+  [...roster].sort((a,b) => a.localeCompare(b)).forEach(name => {
+    const a = document.createElement('a');
+    a.className = 'bdm-rep-link';
+    a.href = 'bdr-map.html?rep=' + encodeURIComponent(name);
+    a.textContent = name;
+    dd.appendChild(a);
   });
 }
 
-// ── Population filter ─────────────────────────────────────────────
-const POP_BUCKETS = [
-  { id:'co-150k', type:'county', min:150000, max:Infinity  },
-  { id:'co-50k',  type:'county', min:50000,  max:150000    },
-  { id:'co-25k',  type:'county', min:25000,  max:50000     },
-  { id:'co-sm',   type:'county', min:0,      max:25000     },
-  { id:'ci-100k', type:'city',   min:100000, max:Infinity  },
-  { id:'ci-50k',  type:'city',   min:50000,  max:100000    },
-  { id:'ci-25k',  type:'city',   min:25000,  max:50000     },
-  { id:'ci-15k',  type:'city',   min:15000,  max:25000     },
-  { id:'ci-10k',  type:'city',   min:10000,  max:15000     },
-  { id:'ci-sm',   type:'city',   min:0,      max:10000     },
-];
-let popFilters = new Set(); // active bucket ids (multi-select)
-let legFilters = new Set(); // active legacy keys (multi-select)
-
-// Legacy filter key → substring match against account's leg field
-const LEG_KEYS = {
-  'iworq':'iworq', 'tyler':'tyler', 'opengov':'opengov', 'mygov':'mygov',
-  'citizenserve':'citizenserve', 'granicus':'granicus', 'accela':'accela',
-  'cloudpermit':'cloudpermit', 'mgo':'mgo'
-};
-
-function getEntityType(name){
-  return /\bcounty\b|\bparish\b/i.test(name) ? 'county' : 'city';
-}
-
-function setPopFilter(id){
-  if(popFilters.has(id)) popFilters.delete(id); else popFilters.add(id);
-  document.querySelectorAll('.pop-btn').forEach(b=>{
-    b.classList.toggle('pop-active', popFilters.has(b.id.replace('pop-','')));
-  });
-  if(popFilters.size > 0 && dotFilter === 'none') setDotFilter('all');
+function toggleRepFilter(rel){
+  repRelFilter = repRelFilter === rel ? null : rel;
+  const ownedBtn = document.getElementById('rfOwned');
+  const ciBtn    = document.getElementById('rfCi');
+  ownedBtn.classList.toggle('active', repRelFilter === 'owned');
+  ownedBtn.classList.toggle('owned',  repRelFilter === 'owned');
+  ciBtn.classList.toggle('active',    repRelFilter === 'calledin');
+  ciBtn.classList.toggle('calledin',  repRelFilter === 'calledin');
   renderDots();
-  renderPanel(currentState || null);
 }
 
-function setLegFilter(key){
-  if(legFilters.has(key)) legFilters.delete(key); else legFilters.add(key);
-  document.querySelectorAll('.leg-btn').forEach(b=>{
-    b.classList.toggle('leg-active', legFilters.has(b.id.replace('leg-','')));
-  });
-  if(legFilters.size > 0 && dotFilter === 'none') setDotFilter('pipeline');
-  renderDots();
-  renderPanel(currentState || null);
+function toggleBdmDropdown(){
+  document.getElementById('bdmPagesDropdown')?.classList.toggle('open');
 }
 
-// ── Dot filter ────────────────────────────────────────────────────
-function setDotFilter(f){
-  // Clicking the already-active filter toggles it off (back to "none" — no dots).
-  if(f !== 'none' && dotFilter === f) f = 'none';
-  dotFilter=f;
-  ['all','customers','pipeline','touched','untouched'].forEach(x=>{
-    const b=document.getElementById('dt-'+x);
-    if(!b) return;
-    b.classList.remove('active-all','active-customers','active-pipeline','active-touched','active-untouched');
-    if(x===f) b.classList.add(`active-${f}`);
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#bdmPagesBar'))  document.getElementById('bdmPagesDropdown')?.classList.remove('open');
+});
+
+function _buildStatusList(){
+  const list = document.getElementById('vp-status-list');
+  if(!list) return;
+  list.innerHTML = '';
+  STATUS_ORDER.forEach(st => {
+    if(!STATUS_LABELS[st]) return; // skip silent statuses
+    const col  = STATUS_COLORS[st];
+    const item = document.createElement('div');
+    item.className    = 'vp-item';
+    item.dataset.code = st;
+    item.innerHTML    = `<span class="vp-check"></span><span class="vp-status-dot" style="background:${col}"></span><span>${STATUS_LABELS[st]}</span>`;
+    item.addEventListener('click', () => toggleStatus(st));
+    list.appendChild(item);
   });
-  renderDots();
-  renderPanel(currentState || null);
 }
+
+function toggleStatusDropdown(){
+  const dd  = document.getElementById('vp-status-dropdown');
+  const btn = document.getElementById('vp-status-trigger');
+  if(!dd || !btn) return;
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  document.getElementById('vp-dropdown')?.classList.remove('open');
+  document.getElementById('vp-trigger')?.classList.remove('open');
+  document.getElementById('vp-activity-dropdown')?.classList.remove('open');
+  document.getElementById('vp-activity-trigger')?.classList.remove('open');
+  if(open){
+    const panel = document.getElementById('visibilityPanel');
+    if(panel){
+      const rect = panel.getBoundingClientRect();
+      dd.style.left = (rect.right + 8) + 'px';
+      dd.style.top  = rect.top + 'px';
+    }
+  }
+}
+
+function toggleStatus(code){
+  if(selectedStatuses.has(code)) selectedStatuses.delete(code);
+  else selectedStatuses.add(code);
+  _updateStatusTrigger();
+  _updateClearBtn();
+  renderDots();
+}
+
+function _updateClearBtn(){
+  const active = visibilityMode !== 'none' || selectedStates.size > 0 || hotbarActive !== 'all' || selectedActivity !== null || selectedPod !== null || selectedRep !== null || selectedPopTiers.size > 0 || popMin !== null || popMax !== null || selectedCompetitors.size > 0;
+  document.getElementById('vp-clear')?.classList.toggle('visible', active);
+  document.getElementById('clearFiltersBtn')?.classList.toggle('active', active);
+}
+
+function _updateHotbar(){
+  document.querySelectorAll('#status-hotbar .shb-btn').forEach(b => b.classList.toggle('active', b.dataset.code === hotbarActive));
+  _updatePipelineSubbar();
+}
+
+document.querySelectorAll('#status-hotbar .shb-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    hotbarActive = hotbarActive === btn.dataset.code ? 'all' : btn.dataset.code;
+    // Reset pipeline sub-filter whenever switching away
+    selectedPipelineTypes.clear();
+    _updatePipelineSubbar();
+    if(visibilityMode === 'none'){
+      visibilityMode = 'all';
+      _updateStateTrigger();
+    }
+    _updateHotbar();
+    _updateClearBtn();
+    renderDots();
+  });
+});
+
+document.querySelectorAll('#pipeline-subbar .shb-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = btn.dataset.pipe;
+    if(p === 'all'){
+      selectedPipelineTypes.clear();
+    } else {
+      if(selectedPipelineTypes.has(p)) selectedPipelineTypes.delete(p);
+      else selectedPipelineTypes.add(p);
+    }
+    _syncPipelineSubbar();
+    renderDots();
+  });
+});
+
+function _syncPipelineSubbar(){
+  const allBtn = document.querySelector('#pipeline-subbar .shb-btn[data-pipe="all"]');
+  const isAll  = selectedPipelineTypes.size === 0;
+  if(allBtn) allBtn.classList.toggle('active', isAll);
+  document.querySelectorAll('#pipeline-subbar .shb-btn[data-pipe]:not([data-pipe="all"])').forEach(b => {
+    b.classList.toggle('active', selectedPipelineTypes.has(b.dataset.pipe));
+  });
+}
+
+function _updatePipelineSubbar(){
+  document.getElementById('pipeline-subbar').classList.toggle('open', hotbarActive === 'pipeline');
+  selectedPipelineTypes.clear();
+  _syncPipelineSubbar();
+}
+
+// ── Competitor filter ─────────────────────────────────────────────
+let selectedCompetitors = new Set();
+
+function _buildCompList(){
+  const list = document.getElementById('comp-list');
+  if(!list) return;
+  list.innerHTML = '';
+  const all = [...new Set(ACCOUNTS.map(a => a.leg).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  all.forEach(name => {
+    const item = document.createElement('div');
+    item.className = 'vp-item';
+    item.dataset.comp = name;
+    item.innerHTML = `<span class="vp-check"></span><span style="font-size:11px">${name}</span>`;
+    item.addEventListener('click', () => _toggleCompetitor(name));
+    list.appendChild(item);
+  });
+}
+
+function _toggleCompetitor(name){
+  if(selectedCompetitors.has(name)) selectedCompetitors.delete(name);
+  else selectedCompetitors.add(name);
+  _updateCompTrigger();
+  _updateClearBtn();
+  renderDots();
+}
+
+function toggleCompDropdown(){
+  const dd  = document.getElementById('comp-dropdown');
+  const btn = document.getElementById('comp-trigger');
+  if(!dd || !btn) return;
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('active', open || selectedCompetitors.size > 0);
+  if(open){
+    document.getElementById('comp-search').value = '';
+    _filterCompList('');
+    document.getElementById('comp-search').focus();
+  }
+}
+
+function _filterCompList(q){
+  const norm = (q||'').toLowerCase();
+  document.querySelectorAll('#comp-list .vp-item').forEach(el => {
+    el.style.display = el.dataset.comp.toLowerCase().includes(norm) ? '' : 'none';
+  });
+}
+
+function _updateCompTrigger(){
+  const n = selectedCompetitors.size;
+  const lbl = document.getElementById('comp-label');
+  if(lbl) lbl.textContent = n === 0 ? 'Competitor…' : n === 1 ? [...selectedCompetitors][0] : `${n} competitors`;
+  document.getElementById('comp-trigger')?.classList.toggle('active', n > 0);
+  document.querySelectorAll('#comp-list .vp-item').forEach(el => {
+    el.classList.toggle('selected', selectedCompetitors.has(el.dataset.comp));
+  });
+}
+
+// Close competitor dropdown when clicking outside
+document.addEventListener('click', e => {
+  const dd  = document.getElementById('comp-dropdown');
+  const btn = document.getElementById('comp-trigger');
+  if(dd && btn && !btn.contains(e.target) && !dd.contains(e.target)){
+    dd.classList.remove('open');
+    if(selectedCompetitors.size === 0) btn.classList.remove('active');
+  }
+});
+
+// ── Activity hotbar ───────────────────────────────────────────────
+document.querySelectorAll('#activity-hotbar .shb-btn[data-act]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.act;
+    selectedActivity = selectedActivity === id ? null : id;
+    _updateActivityHotbar();
+    _updateClearBtn();
+    renderDots();
+  });
+});
+
+function _updateActivityHotbar(){
+  document.querySelectorAll('#activity-hotbar .shb-btn[data-act]').forEach(b => {
+    b.classList.toggle('active', b.dataset.act === selectedActivity);
+  });
+}
+
+// ── Population hotbar ─────────────────────────────────────────────
+document.querySelectorAll('#pop-hotbar .shb-btn[data-pop]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.pop;
+    if(selectedPopTiers.has(t)) selectedPopTiers.delete(t);
+    else selectedPopTiers.add(t);
+    // Clear range inputs when tier preset used
+    document.getElementById('pop-min').value = '';
+    document.getElementById('pop-max').value = '';
+    popMin = null; popMax = null;
+    _updatePopHotbar();
+    _updateClearBtn();
+    renderDots();
+  });
+});
+
+function _onPopRange(){
+  const minEl = document.getElementById('pop-min');
+  const maxEl = document.getElementById('pop-max');
+  popMin = minEl.value !== '' ? parseInt(minEl.value) : null;
+  popMax = maxEl.value !== '' ? parseInt(maxEl.value) : null;
+  minEl.classList.toggle('has-val', popMin !== null);
+  maxEl.classList.toggle('has-val', popMax !== null);
+  if(popMin !== null || popMax !== null){
+    selectedPopTiers.clear();
+    _updatePopHotbar();
+  }
+  _updateClearBtn();
+  renderDots();
+}
+
+document.getElementById('pop-min').addEventListener('input', _onPopRange);
+document.getElementById('pop-max').addEventListener('input', _onPopRange);
+
+function _updatePopHotbar(){
+  document.querySelectorAll('#pop-hotbar .shb-btn[data-pop]').forEach(btn => {
+    btn.classList.toggle('active', selectedPopTiers.has(btn.dataset.pop));
+  });
+}
+
+// ── Team panel ────────────────────────────────────────────────────
+function _buildTeamHotbar(cfg){
+  PODS = cfg.pods || {};
+  OWNER_COLORS = cfg.ownerColors || {};
+
+  // Build pod toggle buttons (header style)
+  const podsRow = document.getElementById('teamPods');
+  if(podsRow){
+    podsRow.innerHTML = '';
+    Object.entries(PODS).forEach(([podName, pod]) => {
+      const btn = document.createElement('button');
+      btn.className = 'team-hdr-btn';
+      btn.dataset.pod = podName;
+      btn.textContent = podName;
+      btn.style.setProperty('--pod-color', pod.color || '#FEAF0E');
+      btn.addEventListener('click', () => _togglePod(podName));
+      podsRow.appendChild(btn);
+    });
+  }
+
+  // Build rep dropdown (all reps sorted alphabetically)
+  const repList = document.getElementById('vp-rep-list');
+  if(repList){
+    repList.innerHTML = '';
+    const allReps = Object.values(PODS).flatMap(p => p.members);
+    const unique  = [...new Set(allReps)].sort((a,b) => a.localeCompare(b));
+    unique.forEach(name => {
+      const item = document.createElement('div');
+      item.className = 'vp-item';
+      item.dataset.rep = name;
+      const col = OWNER_COLORS[name] || '#94a3b8';
+      item.innerHTML = `<span class="vp-check"></span><span class="vp-status-dot" style="background:${col}"></span><span>${name}</span>`;
+      item.addEventListener('click', () => _selectRep(name));
+      repList.appendChild(item);
+    });
+  }
+}
+
+function _togglePod(podName){
+  selectedPod = selectedPod === podName ? null : podName;
+  if(selectedPod) selectedRep = null; // pod selection clears rep
+  _updateTeamPanel();
+  _updateClearBtn();
+  renderDots();
+}
+
+function _selectRep(name){
+  selectedRep = selectedRep === name ? null : name;
+  if(selectedRep) selectedPod = null; // rep selection clears pod
+  _updateTeamPanel();
+  _updateRepTrigger();
+  _updateClearBtn();
+  // Close dropdown
+  document.getElementById('vp-rep-dropdown')?.classList.remove('open');
+  document.getElementById('vp-rep-trigger')?.classList.remove('active');
+  renderDots();
+}
+
+function toggleRepDropdown(){
+  const dd  = document.getElementById('vp-rep-dropdown');
+  const btn = document.getElementById('vp-rep-trigger');
+  if(!dd || !btn) return;
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('active', open);
+  if(open){
+    const r = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 4) + 'px';
+    dd.style.left = Math.max(4, r.right - 220) + 'px';
+  }
+}
+
+// ── State Dashboards dropdown ─────────────────────────────────────
+let _stateDashBuilt = false;
+
+function _buildStateDashList(){
+  if(_stateDashBuilt) return;
+  const list = document.getElementById('state-dash-list');
+  if(!list) return;
+  Object.keys(ABBR).sort().forEach(name => {
+    const item = document.createElement('a');
+    item.className    = 'vp-item';
+    item.href         = 'state-dashboard.html?state=' + encodeURIComponent(name);
+    item.dataset.name = name;
+    item.style.textDecoration = 'none';
+    item.innerHTML = `<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.4);width:22px;flex-shrink:0">${ABBR[name]}</span><span>${name}</span>`;
+    list.appendChild(item);
+  });
+  _stateDashBuilt = true;
+}
+
+function toggleStateDashDropdown(){
+  const dd  = document.getElementById('state-dash-dropdown');
+  const btn = document.getElementById('state-dash-trigger');
+  if(!dd || !btn) return;
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('active', open);
+  if(open){
+    _buildStateDashList(); // build list on first open
+    const r = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 4) + 'px';
+    dd.style.left = Math.max(4, r.right - 220) + 'px';
+    const inp = document.getElementById('state-dash-search');
+    inp.value = '';
+    _filterStateDash('');
+    inp.focus();
+  }
+}
+
+function _filterStateDash(q){
+  const norm = (q||'').toLowerCase();
+  document.querySelectorAll('#state-dash-list .vp-item').forEach(el => {
+    el.style.display = el.dataset.name.toLowerCase().includes(norm) ? '' : 'none';
+  });
+}
+
+document.addEventListener('click', e => {
+  const dd  = document.getElementById('state-dash-dropdown');
+  const btn = document.getElementById('state-dash-trigger');
+  if(dd && btn && !btn.contains(e.target) && !dd.contains(e.target)){
+    dd.classList.remove('open');
+    btn.classList.remove('active');
+  }
+});
+
+function clearTeam(){
+  selectedPod = null;
+  selectedRep = null;
+  _updateTeamPanel();
+  _updateClearBtn();
+  renderDots();
+}
+
+function _updateRepTrigger(){
+  const lbl = document.getElementById('vp-rep-label');
+  if(lbl) lbl.textContent = selectedRep || 'View by Rep…';
+  document.getElementById('vp-rep-trigger')?.classList.toggle('active', !!selectedRep);
+  document.querySelectorAll('#vp-rep-list .vp-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.rep === selectedRep);
+  });
+}
+
+function _updateTeamPanel(){
+  // All button — active when nothing is selected
+  const allBtn = document.getElementById('team-all-btn');
+  if(allBtn) allBtn.classList.toggle('active', !selectedPod && !selectedRep);
+  // Pod buttons
+  document.querySelectorAll('#teamPods .team-hdr-btn').forEach(btn => {
+    const active = btn.dataset.pod === selectedPod;
+    btn.classList.toggle('active', active);
+    if(active){
+      btn.style.borderColor = PODS[btn.dataset.pod]?.color || '';
+      btn.style.color       = PODS[btn.dataset.pod]?.color || '';
+      btn.style.background  = '';
+    } else {
+      btn.style.borderColor = '';
+      btn.style.color       = '';
+      btn.style.background  = '';
+    }
+  });
+  _updateRepTrigger();
+  // Dashboard button
+  const dashBtn = document.getElementById('header-dash-btn');
+  if(dashBtn){
+    if(selectedRep){
+      dashBtn.href = 'rep-dashboard.html?rep=' + encodeURIComponent(selectedRep);
+      dashBtn.classList.add('visible');
+    } else if(!currentState){
+      dashBtn.classList.remove('visible');
+    }
+  }
+}
+
+// Close rep dropdown when clicking outside
+document.addEventListener('click', e => {
+  const trigger = document.getElementById('vp-rep-trigger');
+  const dd      = document.getElementById('vp-rep-dropdown');
+  if(dd && trigger && !trigger.contains(e.target) && !dd.contains(e.target)){
+    dd.classList.remove('open');
+    trigger.classList.remove('active');
+  }
+});
+
+// ── Color mode ────────────────────────────────────────────────────
+document.querySelectorAll('.cm-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    colorMode = btn.dataset.mode;
+    document.querySelectorAll('.cm-pill').forEach(b => b.classList.toggle('active', b.dataset.mode === colorMode));
+    _renderLegend();
+    renderDots();
+  });
+});
+
+function _renderLegend(){
+  const el = document.getElementById('ownerLegend');
+  if(colorMode === 'stage'){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '';
+
+  if(colorMode === 'pod'){
+    Object.entries(PODS).forEach(([podName, pod]) => {
+      const sec = document.createElement('div');
+      sec.className = 'leg-section';
+      sec.innerHTML = '<div class="leg-section-title">' + podName + '</div>' +
+        pod.members.map(m =>
+          '<div class="leg-row"><span class="leg-dot" style="background:' + pod.color + '"></span><span class="leg-name">' + m.split(' ')[0] + ' ' + m.split(' ').slice(-1)[0] + '</span></div>'
+        ).join('');
+      el.appendChild(sec);
+    });
+  } else {
+    // Owner mode — group by pod
+    Object.entries(PODS).forEach(([podName, pod]) => {
+      const sec = document.createElement('div');
+      sec.className = 'leg-section';
+      sec.innerHTML = '<div class="leg-section-title">' + podName + '</div>' +
+        pod.members.map(m =>
+          '<div class="leg-row"><span class="leg-dot" style="background:' + (OWNER_COLORS[m]||'#94a3b8') + '"></span><span class="leg-name">' + m + '</span></div>'
+        ).join('');
+      el.appendChild(sec);
+    });
+  }
+}
+
+function clearFilters(){
+  visibilityMode = 'all';
+  selectedStates.clear();
+  hotbarActive = 'all';
+  pipelineFilter = 'both';
+  selectedActivity = null;
+  selectedCompetitors.clear();
+  _updateActivityHotbar();
+  _updateCompTrigger();
+  selectedPod = null;
+  selectedRep = null;
+  selectedPopTiers.clear();
+  popMin = null; popMax = null;
+  document.getElementById('pop-min').value = '';
+  document.getElementById('pop-max').value = '';
+  document.getElementById('pop-min').classList.remove('has-val');
+  document.getElementById('pop-max').classList.remove('has-val');
+  _updatePopHotbar();
+  _updateTeamPanel();
+  _updateStateTrigger();
+  _updateHotbar();
+  _updateActivityTrigger();
+  _updateClearBtn();
+  renderDots();
+  updateChoro();
+}
+
+function _buildActivityList(){
+  const list = document.getElementById('vp-activity-list');
+  if(!list) return;
+  ACTIVITY_OPTIONS.forEach(opt => {
+    const item = document.createElement('div');
+    item.className = 'vp-item';
+    item.dataset.id = opt.id;
+    item.innerHTML = '<span class="vp-check"></span><span>' + opt.label + '</span>';
+    item.addEventListener('click', () => toggleActivity(opt.id));
+    list.appendChild(item);
+  });
+}
+
+function toggleActivityDropdown(){
+  const dd  = document.getElementById('vp-activity-dropdown');
+  const btn = document.getElementById('vp-activity-trigger');
+  if(!dd || !btn) return;
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  document.getElementById('vp-dropdown')?.classList.remove('open');
+  document.getElementById('vp-trigger')?.classList.remove('open');
+  if(open){
+    const panel = document.getElementById('visibilityPanel');
+    if(panel){
+      const rect = panel.getBoundingClientRect();
+      dd.style.left = (rect.right + 8) + 'px';
+      dd.style.top  = rect.top + 'px';
+    }
+  }
+}
+
+function toggleActivity(id){
+  selectedActivity = selectedActivity === id ? null : id;
+  _updateActivityTrigger();
+  _updateClearBtn();
+  renderDots();
+}
+
+function _updateActivityTrigger(){
+  const opt = selectedActivity ? ACTIVITY_OPTIONS.find(o => o.id === selectedActivity) : null;
+  const lbl = document.getElementById('vp-activity-label');
+  if(lbl) lbl.textContent = opt ? opt.label : 'Activity...';
+  document.getElementById('vp-activity-trigger')?.classList.toggle('open', !!selectedActivity);
+  document.querySelectorAll('#vp-activity-list .vp-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === selectedActivity);
+  });
+}
+
+function _buildStateList(){
+  const list = document.getElementById('vp-list');
+  if(!list) return;
+  const allItem = document.createElement('div');
+  allItem.className = 'vp-item';
+  allItem.dataset.state = '__all__';
+  allItem.innerHTML = '<span class="vp-check"></span><span>All</span>';
+  allItem.addEventListener('click', () => toggleState('__all__'));
+  list.appendChild(allItem);
+  const sep = document.createElement('div');
+  sep.style.cssText = 'height:1px;background:var(--border);margin:2px 0;pointer-events:none';
+  list.appendChild(sep);
+  Object.keys(ABBR).sort().forEach(name => {
+    const item = document.createElement('div');
+    item.className = 'vp-item';
+    item.dataset.state = name;
+    item.innerHTML = '<span class="vp-check"></span><span>' + name + '</span>';
+    item.addEventListener('click', () => toggleState(name));
+    list.appendChild(item);
+  });
+}
+
+function toggleStateDropdown(){
+  const dd    = document.getElementById('vp-dropdown');
+  const btn   = document.getElementById('vp-trigger');
+  const open  = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  if(open){
+    // Position to the right of the Visibility panel so it never blocks Show Table
+    const panel = document.getElementById('visibilityPanel');
+    const rect  = panel.getBoundingClientRect();
+    dd.style.left = (rect.right + 8) + 'px';
+    dd.style.top  = rect.top + 'px';
+    const inp = document.getElementById('vp-search');
+    inp.value = '';
+    _filterStates('');
+    inp.focus();
+  }
+}
+
+function _filterStates(q){
+  const norm = (q||'').toLowerCase();
+  document.querySelectorAll('#vp-list .vp-item').forEach(el => {
+    if(el.dataset.state === '__all__'){ el.style.display = ''; return; }
+    el.style.display = (el.dataset.state||'').toLowerCase().includes(norm) ? '' : 'none';
+  });
+}
+
+function _updateStateTrigger(){
+  const isAll = visibilityMode === 'all';
+  const n = selectedStates.size;
+  const lbl = document.getElementById('vp-trigger-label');
+  if(lbl) lbl.textContent = isAll && n === 0 ? 'All' : n === 0 ? 'State...' : n === 1 ? [...selectedStates][0] : n + ' states';
+  document.getElementById('vp-trigger')?.classList.toggle('open', isAll || n > 0);
+  document.querySelectorAll('#vp-list .vp-item').forEach(el => {
+    if(el.dataset.state === '__all__') el.classList.toggle('selected', isAll && n === 0);
+    else el.classList.toggle('selected', selectedStates.has(el.dataset.state));
+  });
+
+  // Header dashboard button — state context (only if no rep is also selected)
+  const dashBtn2 = document.getElementById('header-dash-btn');
+  if(dashBtn2 && !selectedRep){
+    if(n === 1){
+      const state = [...selectedStates][0];
+      dashBtn2.href = 'state-dashboard.html?state=' + encodeURIComponent(state);
+      dashBtn2.classList.add('visible');
+    } else {
+      dashBtn2.classList.remove('visible');
+    }
+  }
+}
+
+function setVisibility(mode){
+  if(mode === 'all' && visibilityMode === 'all'){
+    visibilityMode = 'none';
+  } else if(mode === 'all'){
+    visibilityMode = 'all';
+    selectedStates.clear();
+    currentState = null;
+  } else {
+    visibilityMode = 'none';
+    selectedStates.clear();
+    currentState = null;
+  }
+  _updateStateTrigger();
+  _updateClearBtn();
+  renderDots();
+  updateChoro();
+}
+
+function toggleState(name){
+  if(name === '__all__'){
+    if(visibilityMode === 'all'){
+      visibilityMode = 'none';
+    } else {
+      visibilityMode = 'all';
+      selectedStates.clear();
+      currentState = null;
+    }
+  } else {
+    // Picking a specific state immediately deactivates All
+    if(visibilityMode === 'all'){
+      visibilityMode = 'none';
+      selectedStates.clear();
+      currentState = null;
+    }
+    if(selectedStates.has(name)){
+      selectedStates.delete(name);
+      visibilityMode = selectedStates.size > 0 ? 'states' : 'none';
+    } else {
+      selectedStates.add(name);
+      visibilityMode = 'states';
+      if(selectedStates.size === 1 && stateLayers[name]){
+        const bounds  = stateLayers[name].getBounds();
+        const naturalZ = map.getBoundsZoom(bounds, false, [40, 40]);
+        map.flyToBounds(bounds, { duration: 0.7, padding: [80, 80], maxZoom: Math.max(3, naturalZ - 1) });
+      }
+    }
+    currentState = selectedStates.size === 1 ? [...selectedStates][0] : null;
+  }
+  _updateStateTrigger();
+  _updateClearBtn();
+  renderDots();
+  updateChoro();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', e => {
+  const stateWrap = document.getElementById('vp-state-wrap');
+  if(stateWrap && !stateWrap.contains(e.target)){
+    document.getElementById('vp-dropdown').classList.remove('open');
+    document.getElementById('vp-trigger').classList.remove('open');
+  }
+});
+
 
 // ── Leaflet map setup ─────────────────────────────────────────────
 const map = L.map('map', {
@@ -669,21 +1530,7 @@ function setBasemap(name){
 }
 setBasemap('dark');
 
-// ── Choropleth scale ──────────────────────────────────────────────
-const chScale = d3.scaleLinear()
-  .domain([0,0.4,0.75])
-  .range(['#161616','#2a2a2a','#404040'])
-  .clamp(true);
-
-function touchRate(name){
-  const d=byState[name]; if(!d||!d.total) return 0;
-  if(activeBdr){
-    const sc=ACCOUNTS.filter(a=>a.s===name&&a.o===activeBdr);
-    return sc.length?sc.filter(a=>TOUCHED_ST.has(a.st)).length/sc.length:0;
-  }
-  return d.touched/d.total;
-}
-function stateColor(n){ return chScale(touchRate(n)); }
+function stateColor(){ return '#1e1e1e'; }
 
 function styleForState(f){
   const name = FIPS[String(f.id).padStart(2,'0')];
@@ -745,83 +1592,131 @@ let ICONS = {};
 let SHAPED = new Set();
 
 function filterForView(accts){
-  // Empty default — nothing renders until user activates a filter.
-  if(dotFilter==='none' && popFilters.size===0 && legFilters.size===0) return [];
-  let out = accts;
-  if(activeTier==='S')          out = out.filter(a=>a.pop!=null && a.pop>=50000);
-  else if(activeTier>0)         out = out.filter(a=>String(a.t)===String(activeTier));
-  if(dotFilter==='customers')   out = out.filter(a=>a.st==='cu');
-  else if(dotFilter==='pipeline')   out = out.filter(a=>PIPELINE_FULL.has(a.st));
-  else if(dotFilter==='touched')    out = out.filter(a=>TOUCHED_ST.has(a.st));
-  else if(dotFilter==='untouched')  out = out.filter(a=>a.st==='u');
-  // Population filter — OR logic across all selected buckets
-  if(popFilters.size > 0){
-    out = out.filter(a=>{
-      if(a.pop==null) return false;
-      return Array.from(popFilters).some(id=>{
-        const bucket = POP_BUCKETS.find(b=>b.id===id);
-        return bucket && getEntityType(a.a)===bucket.type && a.pop>=bucket.min && a.pop<bucket.max;
-      });
+  if(visibilityMode === 'none') return [];
+  let out = visibilityMode === 'all' ? accts : accts.filter(a => selectedStates.has(a.s));
+  if(hotbarActive === 'pipeline'){
+    if(selectedPipelineTypes.size === 0){
+      out = out.filter(a => a.st === 'mf' || a.st === 'tf' || a.st === 'cl');
+    } else {
+      out = out.filter(a =>
+        (selectedPipelineTypes.has('mf')   && a.st === 'mf') ||
+        (selectedPipelineTypes.has('tf')   && a.st === 'tf') ||
+        (selectedPipelineTypes.has('lost') && a.st === 'cl')
+      );
+    }
+  } else if(hotbarActive !== 'all'){
+    out = out.filter(a => a.st === hotbarActive);
+  }
+  if(selectedPopTiers.size > 0 || popMin !== null || popMax !== null){
+    out = out.filter(a => {
+      const p = a.pop;
+      if(popMin !== null || popMax !== null){
+        if(p == null) return false;
+        if(popMin !== null && p < popMin) return false;
+        if(popMax !== null && p > popMax) return false;
+        return true;
+      }
+      if(p == null) return false;
+      return [...selectedPopTiers].some(t => { const [lo,hi] = POP_TIER_RANGES[t]; return p >= lo && p <= hi; });
     });
   }
-  // Legacy software filter — OR logic across all selected solutions
-  if(legFilters.size > 0) out = out.filter(a=>Array.from(legFilters).some(k=>(a.leg||'').toLowerCase().includes(k)));
+  if(repRelFilter) out = out.filter(a => a._rel === repRelFilter);
+  if(selectedRep){
+    out = out.filter(a => a.o === selectedRep);
+  } else if(selectedPod){
+    const podMembers = new Set((PODS[selectedPod]||{}).members||[]);
+    out = out.filter(a => podMembers.has(a.o));
+  }
+  if(selectedActivity){
+    const opt = ACTIVITY_OPTIONS.find(o => o.id === selectedActivity);
+    if(opt) out = out.filter(opt.test);
+  }
+  if(selectedCompetitors.size > 0){
+    out = out.filter(a => a.leg && selectedCompetitors.has(a.leg));
+  }
   return out;
 }
 
-// Build the rich HTML tooltip for a given account (same info as the
-// previous map's hover card — name, status, tier, owner, ARR, legacy sw, etc).
+const FN_SHORT = { bp:'Building', pz:'Planning', ce:'Code Enf.', ot:'Other' };
+const FN_COLOR = { bp:'#60a5fa', pz:'#4ade80', ce:'#fb923c', ot:'#94a3b8' };
+
 function tipHtml(d){
-  const col=STATUS_COLORS[d.st];
-  let extra='';
-  if(d.st==='cl'){
-    extra=`<div class="tt-row"><span>Outcome</span><span class="tt-val" style="color:#f87171">Closed Lost</span></div>
-           <div class="tt-row"><span>Last contact</span><span class="tt-val">Meeting was booked</span></div>`;
-  } else if(d.st==='cu'&&d.arr){
-    extra=`<div class="tt-row"><span>ARR</span><span class="tt-val" style="color:#fbbf24">$${d.arr.toLocaleString()}</span></div>`;
-  } else if(PIPELINE_ST.has(d.st)&&d.arr){
-    extra=`<div class="tt-row"><span>Deal ARR</span><span class="tt-val" style="color:#60a5fa">$${d.arr.toLocaleString()}</span></div>`;
-  }
-  const newBadge=d.n?`<span class="tt-new">✦ New — Mar 2026+</span>`:'';
-  const isPipeline = PIPELINE_ST.has(d.st)||d.st==='cu';
-  const legRow = (d.leg||isPipeline)
-    ? `<div class="tt-row"><span>Legacy software</span><span class="tt-val" style="color:#fb923c">${d.leg||'—'}</span></div>`
+  const col = STATUS_COLORS[d.st];
+
+  const statusRow = STATUS_LABELS[d.st]
+    ? `<div class="tt-row"><span>Status</span><span class="tt-val"><span class="tt-badge" style="background:${col}22;border:1px solid ${col}55;color:${col}">${STATUS_LABELS[d.st]}</span></span></div>`
     : '';
-  const ageRow=!d.n?`<div class="tt-row"><span>ICP status</span><span class="tt-val" style="color:#777">Established (pre-Mar 2026)</span></div>`:'';
-  const fmtMonth = ym => { const [y,m]=ym.split('-'); return new Date(+y,+m-1).toLocaleString('en-US',{month:'short',year:'numeric'}); };
-  const touchRow = d.st==='t'&&d.ld
-    ? `<div class="tt-row"><span>Last touched</span><span class="tt-val" style="color:#38bdf8">${fmtMonth(d.ld)}</span></div>`
-    : '';
-  const stateRow = `<div class="tt-row"><span>State</span><span class="tt-val">${d.s||'—'}</span></div>`;
   const popRow = d.pop!=null
     ? `<div class="tt-row"><span>Population</span><span class="tt-val">${d.pop.toLocaleString()}</span></div>`
     : '';
+  const legRow = d.leg
+    ? `<div class="tt-row"><span>Legacy software</span><span class="tt-val" style="color:#fb923c">${d.leg}</span></div>`
+    : '';
+  const arrRow = d.st==='cu'&&d.arr
+    ? `<div class="tt-row"><span>ARR</span><span class="tt-val" style="color:#fbbf24">$${d.arr.toLocaleString()}</span></div>`
+    : '';
+  const touchedRow = d.lcd
+    ? `<div class="tt-row"><span>Last touched</span><span class="tt-val" style="color:#38bdf8">${fmtLastCall(d.lcd)}</span></div>`
+    : '';
+  const callsRow = d.tc
+    ? `<div class="tt-row"><span>Total calls</span><span class="tt-val">${d.tc}</span></div>`
+    : '';
+  const fnRow = (d.contacts && d.contacts.length)
+    ? (()=>{
+        const present = new Set(d.contacts.map(c => c[2]));
+        const chips = FN_ORDER.filter(fn => present.has(fn))
+          .map(fn => `<span class="tt-badge" style="background:${FN_COLOR[fn]}22;border:1px solid ${FN_COLOR[fn]}55;color:${FN_COLOR[fn]}">${FN_SHORT[fn]}</span>`)
+          .join('');
+        return `<div class="tt-row"><span>Functions</span><span class="tt-val" style="display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end">${chips}</span></div>`;
+      })()
+    : '';
+
+  const relRow = d._rel
+    ? `<div class="tt-row"><span>Relationship</span><span class="tt-val" style="color:${d._rel==='owned'?'#FEAF0E':'#38bdf8'}">${d._rel==='owned'?'Owned':'Called-In'}</span></div>`
+    : '';
+
   return `
-    <div class="tt-name">${d.a} ${newBadge}</div>
-    <div class="tt-row"><span>Status</span>
-      <span class="tt-val"><span class="tt-badge" style="background:${col}22;border:1px solid ${col}55;color:${col}">${STATUS_LABELS[d.st]}</span></span>
-    </div>
+    <div class="tt-name">${d.a}</div>
+    ${relRow}${statusRow}
     <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
-    ${stateRow}${popRow}${ageRow}${touchRow}${legRow}${extra}
-    <div class="tt-row"><span>${VIEW_OWNER_LABEL}</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    <div class="tt-row"><span>State</span><span class="tt-val">${d.s||'—'}</span></div>
+    ${popRow}${legRow}${arrRow}
+    <div class="tt-row"><span>Owner</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
+    ${touchedRow}${callsRow}${fnRow}
     <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
   `;
 }
 
+function getMarkerColor(a){
+  if(colorMode === 'owner') return OWNER_COLORS[a.o] || '#94a3b8';
+  if(colorMode === 'pod'){
+    for(const [name, pod] of Object.entries(PODS)){
+      if(pod.members.includes(a.o)) return pod.color;
+    }
+    return '#94a3b8';
+  }
+  return STATUS_COLORS[a.st] || '#94a3b8';
+}
+
 function buildMarker(a){
   let m;
-  if(SHAPED.has(a.st)){
+  const fillColor = getMarkerColor(a);
+  const useShape  = colorMode === 'stage' && SHAPED.has(a.st);
+  if(useShape){
     m = L.marker([a.la, a.lo], { icon: ICONS[a.st], riseOnHover: true });
   } else {
-    const r = a.st === 'cu' ? CUST_R : DOT_R;
+    const r    = colorMode === 'stage' && a.st === 'cu' ? CUST_R : DOT_R;
+    const isCi = a._rel === 'calledin';
+    const baseStroke = colorMode === 'stage'
+      ? (a.st === 'u' ? '#475569' : a.st === 'cl' ? '#7f1d1d' : 'none')
+      : 'none';
     m = L.circleMarker([a.la, a.lo], {
       renderer: canvasRenderer,
       radius: r,
-      fillColor: STATUS_COLORS[a.st],
-      fillOpacity: a.st === 'u' ? 0.75 : 0.88,
-      color: a.st === 'u' ? '#475569' : a.st === 't' ? '#0c4a6e' : a.st === 'cl' ? '#7f1d1d' : 'none',
-      weight: (a.st === 'u' || a.st === 't' || a.st === 'cl') ? 0.8 : 0,
-      // `bubblingMouseEvents:false` so the state layer doesn't steal our hovers
+      fillColor: fillColor,
+      fillOpacity: colorMode === 'stage' && a.st === 'u' ? 0.75 : 0.88,
+      color: isCi ? 'rgba(255,255,255,0.75)' : baseStroke,
+      weight: isCi ? 2 : (colorMode === 'stage' && (a.st === 'u' || a.st === 'cl') ? 0.8 : 0),
       bubblingMouseEvents: false,
     });
   }
@@ -835,10 +1730,11 @@ function buildMarker(a){
 }
 
 function renderDots(){
+  currentPage = 0;
   dotLayer.clearLayers();
   custLayer.clearLayers();
 
-  let all = ACCOUNTS.filter(a => a.la && a.lo && (!activeBdr || a.o===activeBdr));
+  let all = ACCOUNTS.filter(a => a.la && a.lo);
   if(currentState) all = all.filter(a => a.s === currentState);
   // No national-level suppression — all statuses render, filter bar does the rest.
 
@@ -854,90 +1750,21 @@ function renderDots(){
     if(a.st === 'cu') custLayer.addLayer(m);
     else              dotLayer.addLayer(m);
   });
+  // Debounce table re-render — dots and table may be triggered together
+  clearTimeout(_tableRenderTimer);
+  _tableRenderTimer = setTimeout(renderTable, 60);
 }
 
 // ── Tooltips ──────────────────────────────────────────────────────
 const tipEl=document.getElementById('tooltip');
-const stTipEl=document.getElementById('stateTip');
 
 function showDotTip(ev,d){
-  const col=STATUS_COLORS[d.st];
-  let extra='';
-  if(d.st==='cl'){
-    extra=`<div class="tt-row"><span>Outcome</span><span class="tt-val" style="color:#f87171">Closed Lost</span></div>
-           <div class="tt-row"><span>Last contact</span><span class="tt-val">Meeting was booked</span></div>`;
-  } else if(d.st==='cu'&&d.arr){
-    extra=`<div class="tt-row"><span>ARR</span><span class="tt-val" style="color:#fbbf24">$${d.arr.toLocaleString()}</span></div>`;
-  } else if(PIPELINE_ST.has(d.st)&&d.arr){
-    extra=`<div class="tt-row"><span>Deal ARR</span><span class="tt-val" style="color:#60a5fa">$${d.arr.toLocaleString()}</span></div>`;
-  }
-  const newBadge=d.n?`<span class="tt-new">✦ New — Mar 2026+</span>`:'';
-  const isPipeline = PIPELINE_ST.has(d.st)||d.st==='cu';
-  const legRow = (d.leg||isPipeline)
-    ? `<div class="tt-row"><span>Legacy software</span><span class="tt-val" style="color:#fb923c">${d.leg||'—'}</span></div>`
-    : '';
-  const ageRow=!d.n?`<div class="tt-row"><span>ICP status</span><span class="tt-val" style="color:#777">Established (pre-Mar 2026)</span></div>`:'';
-  const fmtMonth = ym => { const [y,m]=ym.split('-'); return new Date(+y,+m-1).toLocaleString('en-US',{month:'short',year:'numeric'}); };
-  const touchRow = d.st==='t'&&d.ld
-    ? `<div class="tt-row"><span>Last touched</span><span class="tt-val" style="color:#38bdf8">${fmtMonth(d.ld)}</span></div>`
-    : '';
-
-  const popRow2 = d.pop!=null
-    ? `<div class="tt-row"><span>Population</span><span class="tt-val">${d.pop.toLocaleString()}</span></div>`
-    : '';
-  tipEl.innerHTML=`
-    <div class="tt-name">${d.a} ${newBadge}</div>
-    <div class="tt-row"><span>Status</span>
-      <span class="tt-val"><span class="tt-badge" style="background:${col}22;border:1px solid ${col}55;color:${col}">${STATUS_LABELS[d.st]}</span></span>
-    </div>
-    <div class="tt-row"><span>Tier</span><span class="tt-val">Tier ${d.t}</span></div>
-    ${popRow2}${ageRow}${touchRow}${legRow}${extra}
-    <div class="tt-row"><span>${VIEW_OWNER_LABEL}</span><span class="tt-val" style="color:#888">${d.o||'—'}</span></div>
-    <div class="tt-row" style="color:#444;font-size:9px"><span>Click dot to zoom in</span></div>
-  `;
+  tipEl.innerHTML=tipHtml(d);
   tipEl.style.display='block'; moveTip(ev,tipEl);
 }
 function hideDotTip(){ tipEl.style.display='none'; }
 
-function showStateTip(ev,name){
-  const d=byState[name]; if(!d) return;
-  const rate=d.total?Math.round(d.touched/d.total*100):0;
-  const col=rate>60?'#4ade80':rate>35?'#facc15':'#f87171';
-  stTipEl.innerHTML=`
-    <div style="font-weight:700;color:#fff;font-size:11px;margin-bottom:5px">${name}</div>
-    <div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;font-size:10px">
-      <span style="color:#555">ICP Accounts</span><span style="color:#e2e8f0;font-weight:700">${d.total.toLocaleString()}</span>
-      <span style="color:#555">Touched</span><span style="color:${col};font-weight:700">${rate}%</span>
-      <span style="color:#555">In Pipeline</span><span style="color:#60a5fa;font-weight:700">${d.pipeline}</span>
-      <span style="color:#555">Customers</span><span style="color:#fbbf24;font-weight:700">${d.customers}</span>
-    </div>`;
-  stTipEl.style.display='block'; moveTip(ev,stTipEl);
-}
-function hideStateTip(){ stTipEl.style.display='none'; }
 
-const fTipEl = document.getElementById('filterTip');
-function showFilterTip(ev, filter){
-  const scope = currentState
-    ? ACCOUNTS.filter(a=>a.s===currentState&&(!activeBdr||a.o===activeBdr))
-    : ACCOUNTS.filter(a=>(!activeBdr||a.o===activeBdr));
-  let base;
-  if(filter==='touched')   base = scope.filter(a=>TOUCHED_ST.has(a.st));
-  else                     base = scope.filter(a=>a.st==='u');
-  const total = base.length;
-  const newCount = base.filter(a=>a.n).length;
-  const pct = total>0 ? Math.round(newCount/total*100) : 0;
-  fTipEl.innerHTML=`
-    <div style="font-weight:700;color:#e2e8f0;font-size:11px;margin-bottom:5px">
-      ${filter==='touched'?'Touched':'Untouched'} ${currentState?'· '+currentState:'(All States)'}
-    </div>
-    <div style="display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:10px">
-      <span style="color:#555">Total accounts</span><span style="color:#e2e8f0;font-weight:700">${total.toLocaleString()}</span>
-      <span style="color:#555">✦ New (Mar 2026+)</span><span style="color:#34d399;font-weight:700">${newCount.toLocaleString()} <span style="color:#555">(${pct}%)</span></span>
-    </div>`;
-  fTipEl.style.display='block';
-  moveTip(ev,fTipEl);
-}
-function hideFilterTip(){ fTipEl.style.display='none'; }
 
 function moveTip(ev,el){
   const mw=window.innerWidth,mh=window.innerHeight,tw=250,th=170;
@@ -945,235 +1772,209 @@ function moveTip(ev,el){
   el.style.top =(ev.clientY+th+10>mh?ev.clientY-th-6:ev.clientY+10)+'px';
 }
 
-// ── Panel ─────────────────────────────────────────────────────────
-function pctStr(n,d){ return d>0?Math.round(n/d*100)+'%':'—'; }
 
-function iconSvg(st,r){
-  return `<svg width="${r*2}" height="${r*2}" viewBox="${-r} ${-r} ${r*2} ${r*2}"><path d="${symPath(st,r)}" fill="${STATUS_COLORS[st]}" fill-opacity="${st==='u'?.7:.9}"/></svg>`;
-}
+// ── Table panel ──────────────────────────────────────────────────
+let tableVisible = false;
 
-function renderPanel(name){
-  // `name` may be null/undefined → render a national summary across all states.
-  const isNational = !name;
-  if(!isNational){
-    const s=byState[name]; if(!s) return;
+const TIER_COLORS = {
+  'S': { bg:'rgba(251,146,60,.15)', color:'#fb923c' },
+  '1': { bg:'rgba(34,197,94,.15)',  color:'#4ade80' },
+  '2': { bg:'rgba(96,165,250,.15)', color:'#60a5fa' },
+  '3': { bg:'rgba(168,85,247,.15)', color:'#c084fc' },
+};
+
+let _tableRenderTimer = null;
+
+const FN_LABELS = { bp:'Building / Permitting', pz:'Planning & Zoning', ce:'Code Enforcement', ot:'Other' };
+const FN_ORDER  = ['bp','pz','ce','ot'];
+
+function buildExpandPane(acct){
+  if(!acct) return '';
+  const sections = [];
+
+  // ── Calls breakdown ──────────────────────────────────────────────
+  if(acct.reps && acct.reps.length){
+    const chips = acct.reps
+      .map(([name, n]) => `<span class="rep-chip"><strong>${name}</strong> · ${n}</span>`)
+      .join('');
+    sections.push(`
+      <div>
+        <div class="act-block-label">Call breakdown — ${acct.tc} total</div>
+        <div class="rep-breakdown">${chips}</div>
+      </div>`);
   }
-  document.getElementById('panelEmpty').style.display='none';
-  const pc=document.getElementById('panelContent');
-  pc.classList.add('visible');
 
-  const scopeAll = isNational
-    ? ACCOUNTS.filter(a => !activeBdr || a.o===activeBdr)
-    : ACCOUNTS.filter(a => a.s===name && (!activeBdr || a.o===activeBdr));
-  const N=scopeAll.length;
-  const tch=scopeAll.filter(a=>TOUCHED_ST.has(a.st)).length;
-  const pipe=scopeAll.filter(a=>PIPELINE_ST.has(a.st)).length;
-  const cust=scopeAll.filter(a=>a.st==='cu').length;
-  const tc=pctStr(tch,N);
-  const touchCol=N&&tch/N>0.6?'#4ade80':N&&tch/N>0.35?'#facc15':'#f87171';
+  // ── Contacts by function ─────────────────────────────────────────
+  if(acct.contacts && acct.contacts.length){
+    const byFn = {};
+    FN_ORDER.forEach(fn => byFn[fn] = []);
+    acct.contacts.forEach(c => { if(byFn[c[2]]) byFn[c[2]].push(c); });
 
-  function legacyNewSection(){
-    const legN   = scopeAll.filter(a=>!a.n).length;
-    const legTch = scopeAll.filter(a=>!a.n&&TOUCHED_ST.has(a.st)).length;
-    const newN   = scopeAll.filter(a=>a.n).length;
-    const newTch = scopeAll.filter(a=>a.n&&TOUCHED_ST.has(a.st)).length;
-
-    function tierBars(isNew){
-      return [1,2,3].map(t=>{
-        const accts=scopeAll.filter(a=>a.t==t&&(isNew?a.n:!a.n));
-        const tN=accts.length; if(!tN) return '';
-        const tTch=accts.filter(a=>TOUCHED_ST.has(a.st)).length;
-        const pct=tN?Math.round(tTch/tN*100):0;
-        const col=pct>60?'#4ade80':pct>35?'#facc15':'#f87171';
-        const tierLabel=`T${t} ${isNew?'New':'Legacy'}`;
-        return `<div class="bar-row">
-          <div class="bar-hdr">
-            <span class="bar-lbl">${tierLabel} (${tN} accts)</span>
-            <span class="bar-pct" style="color:${col}">${pct}%</span>
-          </div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>
+    const groups = FN_ORDER
+      .filter(fn => byFn[fn].length)
+      .map(fn => {
+        const rows = byFn[fn].map(([name, title, , last]) => {
+          const lastStr = last ? `<span class="contact-last">${fmtLastCall(last)}</span>` : '';
+          return `<div class="contact-row">
+            <span class="contact-name">${name}</span>
+            <span class="contact-title">${title||'—'}</span>
+            ${lastStr}
+          </div>`;
+        }).join('');
+        return `<div class="contact-group">
+          <div class="contact-group-head">${FN_LABELS[fn]} <span class="contact-group-count">${byFn[fn].length}</span></div>
+          ${rows}
         </div>`;
       }).join('');
-    }
 
-    return `
-    <div class="ps">
-      <div class="ps-title">
-        Legacy ICP Accounts
-        <span class="ps-badge" style="background:rgba(239,68,68,.15);color:#f87171">Pre-Mar 2026</span>
-      </div>
-      <div class="leg-cards">
-        <div class="leg-card">
-          <div class="lc-val" style="color:#e2e8f0">${legN.toLocaleString()}</div>
-          <div class="lc-lbl">Legacy ICP</div>
-          <div class="lc-sub">${pctStr(legN,N)} of total</div>
-        </div>
-        <div class="leg-card">
-          <div class="lc-val" style="color:${legN?pctStr(legTch,legN)>'60%'?'#4ade80':'#facc15':'#555'}">${pctStr(legTch,legN)}</div>
-          <div class="lc-lbl">Legacy Touched</div>
-          <div class="lc-sub">${legTch} accts</div>
-        </div>
-      </div>
-      ${tierBars(false)}
-    </div>
-    <div class="ps">
-      <div class="ps-title">
-        New ICP Accounts
-        <span class="ps-badge" style="background:rgba(52,211,153,.15);color:#34d399">Mar 2026+</span>
-      </div>
-      <div class="leg-cards">
-        <div class="leg-card">
-          <div class="lc-val" style="color:#34d399">${newN.toLocaleString()}</div>
-          <div class="lc-lbl">New ICP</div>
-          <div class="lc-sub">${pctStr(newN,N)} of total</div>
-        </div>
-        <div class="leg-card">
-          <div class="lc-val" style="color:${newN?pctStr(newTch,newN)>'60%'?'#4ade80':'#facc15':'#555'}">${pctStr(newTch,newN)}</div>
-          <div class="lc-lbl">New Touched</div>
-          <div class="lc-sub">${newTch} accts</div>
-        </div>
-      </div>
-      ${newN?tierBars(true):'<div class="more-row">No new accounts in this state</div>'}
-    </div>`;
+    sections.push(`
+      <div>
+        <div class="act-block-label">Contacts</div>
+        ${groups}
+      </div>`);
   }
 
-  function pipelineSection(){
-    const stages=STATUS_ORDER.filter(st=>PIPELINE_ST.has(st));
-    const rows=stages.map(st=>{
-      const cnt=scopeAll.filter(a=>a.st===st).length;
-      return cnt?`<div class="pr">
-        <div class="pr-lbl">${iconSvg(st,8)} ${STATUS_LABELS[st]}</div>
-        <div class="pr-val" style="color:${STATUS_COLORS[st]}">${cnt}</div>
-      </div>`:'';
-    }).join('');
-    return rows?`<div class="ps"><div class="ps-title">Active Pipeline</div>${rows}</div>`:'';
+  const sfUrl = 'https://govwell.lightning.force.com/lightning/r/Account/' + acct.id + '/view';
+  const sbLink = acct.sb
+    ? `<a class="act-tool-link sb" href="https://dashboard.starbridge.ai/buyers/${acct.sb}" target="_blank" rel="noopener" title="Open in Starbridge"><img src="sb-logo.jpg" alt="Starbridge"></a>`
+    : '';
+  const tools = `<div class="act-tools">
+    <div class="act-block-label">Tools</div>
+    <a class="act-tool-link sf" href="${sfUrl}" target="_blank" rel="noopener" title="Open in Salesforce">
+      <img src="sf-logo.png" alt="Salesforce">
+    </a>
+    ${sbLink}
+  </div>`;
+
+  return `<div class="act-expand"><div class="act-expand-main">${sections.join('')}</div>${tools}</div>`;
+}
+
+function fmtLastCall(yyyy_mm_dd){
+  if(!yyyy_mm_dd) return '—';
+  const [y, m, d] = yyyy_mm_dd.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m-1]} ${d}, ${y}`;
+}
+
+function toggleTable(){
+  tableVisible = !tableVisible;
+  document.getElementById('tablePanel').classList.toggle('hidden', !tableVisible);
+  const btn = document.getElementById('stbBtn');
+  btn.textContent = tableVisible ? 'Hide Table' : 'Show Table';
+  btn.classList.toggle('active', tableVisible);
+  if(tableVisible){
+    // Defer until after the CSS transition (200ms) so the panel animation is smooth
+    document.getElementById('tableCount').textContent = '…';
+    document.getElementById('tableBody').innerHTML = '';
+    clearTimeout(_tableRenderTimer);
+    _tableRenderTimer = setTimeout(renderTable, 220);
+  }
+}
+
+function renderTable(){
+  if(!tableVisible) return;
+  clearTimeout(_tableRenderTimer);
+
+  const all = filterForView(ACCOUNTS.filter(a => a.la && a.lo));
+
+  // Sort: rep mode keeps owned-first grouping (sort within groups); otherwise flat sort
+  if(REP_FILTER && !tableSort.col){
+    all.sort((a, b) => {
+      if(a._rel === b._rel) return 0;
+      return a._rel === 'owned' ? -1 : 1;
+    });
+  } else if(tableSort.col){
+    const sorted = _applyTableSort(all);
+    all.splice(0, all.length, ...sorted);
   }
 
-  function customersSection(){
-    const ca=scopeAll.filter(a=>a.st==='cu');
-    if(!ca.length) return '';
-    const totalArr=ca.reduce((s,a)=>s+(a.arr||0),0);
-    return `<div class="ps">
-      <div class="ps-title">
-        Customers
-        <span class="ps-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">${ca.length} active · $${Math.round(totalArr/1000)}K ARR</span>
-      </div>
-      ${ca.map(a=>`<div class="acct-row">
-        <div class="acct-name">★ ${a.a}</div>
-        <div class="acct-sub"><span style="color:#fbbf24">${a.arr?'$'+a.arr.toLocaleString():'—'}</span>${a.leg?` · <span style="color:#f97316">${a.leg}</span>`:''}</div>
-      </div>`).join('')}
-    </div>`;
+  _updateSortHeaders();
+  _totalTablePages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  if(currentPage >= _totalTablePages) currentPage = _totalTablePages - 1;
+
+  const start = currentPage * PAGE_SIZE;
+  const rows  = all.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('tableCount').textContent = all.length.toLocaleString();
+
+  const pager = document.getElementById('tablePager');
+  if(_totalTablePages > 1){
+    pager.style.display = 'flex';
+    document.getElementById('pagerPrev').disabled = currentPage === 0;
+    document.getElementById('pagerNext').disabled = currentPage === _totalTablePages - 1;
+    document.getElementById('pagerInfo').textContent = `Page ${currentPage + 1} of ${_totalTablePages}`;
+  } else {
+    pager.style.display = 'none';
   }
 
-  function closedLostSection(){
-    const cl=scopeAll.filter(a=>a.st==='cl');
-    if(!cl.length) return '';
-    return `<div class="ps">
-      <div class="ps-title">Closed Lost — had meeting <span class="ps-badge" style="background:rgba(239,68,68,.12);color:#f87171">${cl.length}</span></div>
-      ${cl.slice(0,7).map(a=>`<div class="acct-row">
-        <div class="acct-name" style="color:#666">× ${a.a}</div>
-        ${a.leg?`<div class="acct-sub" style="color:#f97316">${a.leg}</div>`:''}
-      </div>`).join('')}
-      ${cl.length>7?`<div class="more-row">+ ${cl.length-7} more</div>`:''}
-    </div>`;
+  const tc = TIER_COLORS;
+  const rowHtml = a => {
+    const tc2    = tc[a.t] || {};
+    const hasAct = (a.reps && a.reps.length > 0) || (a.contacts && a.contacts.length > 0);
+    const expBtn = hasAct ? `<button class="exp-btn" data-id="${a.id}" title="Show call breakdown">▶</button>` : '';
+    const callsCell = a.tc != null ? a.tc : '—';
+    const lastCell  = a.lcd ? fmtLastCall(a.lcd) : '—';
+    const lastStale = _lcdAge(a.lcd) > _MS_90D;
+    const stColor = STATUS_COLORS[a.st] || '#94a3b8';
+    const stLabel = STATUS_LABELS[a.st] || '';
+    const stageLabel = STATUS_LABELS[a.st] || '—';
+    const competitor = a.leg || '—';
+    return `<tr data-id="${a.id}"><td class="col-exp">${expBtn}</td><td class="col-name" title="${a.a}">${a.a}</td><td class="col-st">${ABBR[a.s]||''}</td><td class="col-owner" title="${a.o||''}">${a.o||'—'}</td><td class="col-stage" title="${stageLabel}">${stageLabel}</td><td class="col-tier"><span class="tier-badge" style="background:${tc2.bg||'transparent'};color:${tc2.color||'inherit'}">T${a.t}</span></td><td class="col-pop">${a.pop!=null?a.pop.toLocaleString():'—'}</td><td class="col-calls">${callsCell}</td><td class="col-last"${lastStale?' style="color:#ef4444;font-weight:600"':''}>${lastCell}</td><td class="col-competitor" title="${competitor}">${competitor}</td></tr>`;
+  };
+  const sectionHdr = (label, count, type) =>
+    `<tr class="table-section-hdr ${type}"><td colspan="10"><span class="tsh-label">${label}</span><span class="tsh-count">${count.toLocaleString()}</span></td></tr>`;
+
+  let html;
+  if(REP_FILTER){
+    const totalOwned = all.filter(a => a._rel === 'owned').length;
+    const totalCi    = all.filter(a => a._rel === 'calledin').length;
+    const ciStart    = totalOwned; // owned are first so ci begins at this index
+
+    html = '';
+    if(start === 0 && totalOwned > 0) html += sectionHdr('Owned Accounts', totalOwned, 'owned');
+    rows.forEach((a, i) => {
+      if((start + i) === ciStart && totalCi > 0) html += sectionHdr('Called-In Accounts', totalCi, 'calledin');
+      html += rowHtml(a);
+    });
+  } else {
+    html = rows.map(rowHtml).join('');
   }
 
-  function untouchedSection(){
-    const byTier={1:[],2:[],3:[]};
-    scopeAll.filter(a=>a.st==='u').forEach(a=>{(byTier[parseInt(a.t)||3]).push(a);});
-    return [1,2,3].map(t=>{
-      const accts=byTier[t]; if(!accts.length) return '';
-      const nw=accts.filter(a=>a.n).length;
-      return `<div class="ps">
-        <div class="ps-title">
-          <span class="tb ${t===1?'t1b':t===2?'t2b':'t3b'}">Tier ${t}</span>
-          ${accts.length} untouched ${nw?`· <span style="color:#34d399">${nw} new</span>`:''}
-        </div>
-        ${accts.map(a=>`<div class="acct-row">
-          <div class="acct-name">${a.a}</div>
-          <div class="acct-sub">
-            <span class="tb ${t===1?'t1b':t===2?'t2b':'t3b'}">T${t}</span>
-            ${a.n?'<span style="color:#34d399">✦ New</span>':''}
-          </div>
-        </div>`).join('')}
-      </div>`;
-    }).join('');
-  }
+  requestAnimationFrame(() => {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = html;
+    // Wire expand buttons
+    tbody.querySelectorAll('.exp-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id     = btn.dataset.id;
+        const tr     = btn.closest('tr');
+        const isOpen = btn.classList.contains('open');
+        document.querySelectorAll('.act-detail').forEach(d => d.remove());
+        document.querySelectorAll('.exp-btn.open').forEach(b => b.classList.remove('open'));
+        if(!isOpen){
+          btn.classList.add('open');
+          const acct = ACCOUNTS.find(a => a.id === id);
+          const detail = document.createElement('tr');
+          detail.className = 'act-detail';
+          detail.innerHTML = `<td colspan="10">${buildExpandPane(acct)}</td>`;
+          tr.after(detail);
+        }
+      });
+    });
+  });
+}
 
-  function touchedSection(){
-    const tNoOpp=scopeAll.filter(a=>a.st==='t');
-    return `
-    ${pipelineSection()}
-    ${customersSection()}
-    ${closedLostSection()}
-    <div class="ps" style="border-bottom:none">
-      <div class="ps-title">Called — No Opportunity Yet <span class="ps-badge" style="background:#1a1a1a;color:#555">${tNoOpp.length}</span></div>
-      ${tNoOpp.map(a=>`<div class="acct-row">
-        <div class="acct-name">${a.a}</div>
-        <div class="acct-sub">
-          <span class="tb ${a.t==='1'?'t1b':a.t==='2'?'t2b':'t3b'}">T${a.t}</span>
-          ${a.n?'<span style="color:#34d399">✦ New</span>':''}
-        </div>
-      </div>`).join('')}
-    </div>`;
-  }
-
-  const body = dotFilter==='touched'   ? touchedSection()
-             : dotFilter==='untouched' ? untouchedSection()
-             : pipelineSection()+customersSection()+closedLostSection()+legacyNewSection();
-
-  const headerName = isNational ? 'United States' : name;
-  const headerMeta = isNational
-    ? 'All 50 states'
-    : (ABBR[name]||'');
-  pc.innerHTML=`
-  <div class="ph">
-    <div class="ph-name">${headerName}</div>
-    <div class="ph-meta">${headerMeta}${activeBdr?' · '+activeBdr.split(' ')[0]:''}</div>
-    <div class="ph-toggle">
-      <button class="pht-btn${dotFilter==='all'?' pa':''}"         onclick="setDotFilter('all')">All</button>
-      <button class="pht-btn${dotFilter==='customers'?' pc':''}"   onclick="setDotFilter('customers')">★ Cust.</button>
-      <button class="pht-btn${dotFilter==='pipeline'?' pp':''}"    onclick="setDotFilter('pipeline')">◆ Pipeline</button>
-      <button class="pht-btn${dotFilter==='touched'?' pt':''}"     onclick="setDotFilter('touched')">● Touched</button>
-      <button class="pht-btn${dotFilter==='untouched'?' pu':''}"   onclick="setDotFilter('untouched')">○ Untouched</button>
-    </div>
-    <div class="tier-toggle">
-      <button class="tier-btn${activeTier===0?' talla':''}"   onclick="setTier(0)">All Tiers</button>
-      <button class="tier-btn${activeTier===1?' t1a':''}"     onclick="setTier(1)">T1</button>
-      <button class="tier-btn${activeTier===2?' t2a':''}"     onclick="setTier(2)">T2</button>
-      <button class="tier-btn${activeTier===3?' t3a':''}"     onclick="setTier(3)">T3</button>
-      <button class="tier-btn${activeTier==='S'?' tsa':''}"   onclick="setTier('S')" title="Pop 50k+">S</button>
-    </div>
-    <div class="ph-stats">
-      <div class="ph-stat"><div class="ph-sv">${N.toLocaleString()}</div><div class="ph-sl">ICP</div></div>
-      <div class="ph-stat"><div class="ph-sv" style="color:${touchCol}">${tc}</div><div class="ph-sl">Touched</div></div>
-      <div class="ph-stat"><div class="ph-sv" style="color:#60a5fa">${pipe}</div><div class="ph-sl">Pipeline</div></div>
-      <div class="ph-stat"><div class="ph-sv" style="color:#fbbf24">${cust}</div><div class="ph-sl">Cust.</div></div>
-    </div>
-  </div>
-  ${body}`;
+function prevPage(){
+  if(currentPage > 0){ currentPage--; renderTable(); document.getElementById('tableWrap').scrollTop = 0; }
+}
+function nextPage(){
+  if(currentPage < _totalTablePages - 1){ currentPage++; renderTable(); document.getElementById('tableWrap').scrollTop = 0; }
 }
 
 // ── Legend ────────────────────────────────────────────────────────
-function buildLegend(){
-  document.getElementById('legend').innerHTML=
-    `<div class="leg-title">Account Status</div>`+
-    STATUS_ORDER.map(st=>{
-      const cnt=ACCOUNTS.filter(a=>a.st===st).length;
-      return `<div class="leg-row">
-        <span class="leg-icon">${iconSvg(st,8)}</span>
-        <span>${STATUS_LABELS[st]}</span>
-        <span class="leg-cnt">${cnt.toLocaleString()}</span>
-      </div>`;
-    }).join('');
-}
 
 // ── State selection + zoom ────────────────────────────────────────
-function setTier(n){
-  activeTier=n;
-  renderDots();
-  renderPanel(currentState || null);
-}
 
 // ── Dot click: zoom into the surrounding metropolitan area ─────────
 // Target z=10 (~30 miles across — covers a metro area + suburbs). If the
@@ -1186,35 +1987,12 @@ function zoomToDot(d){
 // Alias retained for clarity at call sites
 function panToDot(d){ zoomToDot(d); }
 
-function selectState(name, layer){
-  currentState=name; activeTier=0;
-  // Clicking into a state is a narrowing gesture — auto-surface dots if the
-  // user hasn't picked a filter yet. Otherwise preserve their choice.
-  if(dotFilter === 'none') setDotFilter('all');
-  document.getElementById('backBtn').classList.add('visible');
-  document.getElementById('dotToggle').classList.add('visible');
-  if(layer && layer.getBounds){
-    // Fit the state with breathing room: one zoom level less than the natural
-    // tight fit, so dots aren't cramped against the edges.
-    const bounds = layer.getBounds();
-    const naturalZ = map.getBoundsZoom(bounds, false, [40, 40]);
-    const targetZ = Math.max(3, naturalZ - 1);
-    map.flyToBounds(bounds, { duration: 0.7, padding: [80, 80], maxZoom: targetZ });
-  }
-  updateChoro();
-  renderPanel(name);
-  renderDots();
+function selectState(name){
+  toggleState(name);
 }
 
 function resetView(){
-  currentState=null;
-  // Reset back to the empty initial view — no dots until user re-selects.
-  setDotFilter('none');
-  document.getElementById('backBtn').classList.remove('visible');
-  // Panel switches from state view back to national summary (not empty).
-  renderPanel(null);
-  updateChoro();
-  // Continental US fit (matches initial view)
+  setVisibility('none');
   map.flyToBounds([[24.5,-125],[49.5,-66]], { duration: 0.6, padding: [20, 20] });
 }
 
@@ -1272,7 +2050,7 @@ function resetView(){
   function selectResult(i){
     const a = lastMatches[i]; if(!a || a.la==null || a.lo==null) return;
     // Ensure the matched account is actually visible on the map.
-    if(dotFilter === 'none') setDotFilter('all');
+    if(visibilityMode === 'none') setVisibility('all');
     const targetZ = Math.max(map.getZoom(), 10);
     map.flyTo([a.la, a.lo], targetZ, { duration: 0.7 });
     // Show the hover tooltip at the account's screen position after the
@@ -1354,23 +2132,35 @@ map.on('contextmenu', (e) => {
 
 // ── Initialize map and static UI ─────────────────────────────────
 map.fitBounds([[24.5,-125],[49.5,-66]], { padding:[20,20] });
-buildLegend();
-document.getElementById('dataDate').textContent = 'Loading…';
+if(!REP_FILTER) document.getElementById('dataDate').textContent = 'Loading…';
 
 // ── Load view config + account data in parallel, then first paint ─
 Promise.all([
-  fetch('view-config-bdr.json').then(r => { if(!r.ok) throw new Error('config HTTP '+r.status); return r.json(); }),
-  fetch('accounts_data.json')  .then(r => { if(!r.ok) throw new Error('data HTTP '+r.status);   return r.json(); }),
+  fetch('view-config-bdr.json?v=%%DATA_VERSION%%').then(r => { if(!r.ok) throw new Error('config HTTP '+r.status); return r.json(); }),
+  fetch('accounts_data.json?v=%%DATA_VERSION%%')  .then(r => { if(!r.ok) throw new Error('data HTTP '+r.status);   return r.json(); }),
 ]).then(([cfg, data]) => {
   _applyViewConfig(cfg);
   ACCOUNTS = data;
-  _computeByState();
+  _buildCompList();
+
+  if(REP_FILTER){
+    ACCOUNTS = ACCOUNTS.filter(a => {
+      if(a.o === REP_FILTER){ a._rel = 'owned'; return true; }
+      if(Array.isArray(a.reps) && a.reps.some(r => r[0] === REP_FILTER)){ a._rel = 'calledin'; return true; }
+      return false;
+    });
+    visibilityMode = 'all';
+    _updateStateTrigger();
+    document.getElementById('bdmPagesBar')?.setAttribute('style','display:none');
+    document.getElementById('repFilterBar').style.display = 'block';
+  }
+
   updateChoro();        // re-style states if boundaries already loaded
-  buildPills();
-  document.getElementById('dataDate').textContent = DATA_VERSION + ' · ' + data.length.toLocaleString() + ' accounts';
+  if(!REP_FILTER){
+    document.getElementById('dataDate').textContent = DATA_VERSION + ' · ' + data.length.toLocaleString() + ' accounts';
+  }
   try {
     renderDots();
-    renderPanel(null);
     console.log('[bdr-map] initial renderDots OK — total accounts:', ACCOUNTS.length);
   } catch(err){
     console.error('[bdr-map] renderDots threw:', err);
@@ -1390,9 +2180,8 @@ fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
       onEachFeature: (f, layer) => {
         const name = FIPS[String(f.id).padStart(2,'0')];
         if(!name) return;
-        layer.on('click', (e) => { L.DomEvent.stop(e); selectState(name, layer); });
-        layer.on('mousemove', (e) => { showStateTip(e.originalEvent, name); });
-        layer.on('mouseout', () => { hideStateTip(); });
+        stateLayers[name] = layer;
+        layer.on('click', (e) => { L.DomEvent.stop(e); selectState(name); });
       }
     }).addTo(map);
     // Keep state layer under markers
@@ -1404,6 +2193,77 @@ fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
 // The dot canvas pane (z-index 450) sits above the SVG state layer
 // (overlayPane, z-index 400), so DOM clicks on areas with canvas coverage
 // never reach the state polygons — layer.on('click') alone is unreliable.
+// ── Theme toggle ─────────────────────────────────────────────
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  if(currentBasemap === 'dark' || currentBasemap === 'light') {
+    setBasemap(dark ? 'dark' : 'light');
+  }
+  localStorage.setItem('gwTheme', dark ? 'dark' : 'light');
+}
+document.getElementById('themeToggle').addEventListener('click', () => {
+  applyTheme(!document.documentElement.classList.contains('dark'));
+});
+(function(){
+  const saved = localStorage.getItem('gwTheme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved ? saved === 'dark' : prefersDark);
+})();
+
+// ── Table row → map pan + highlight ──────────────────────────────
+let _pulseMarker = null;
+
+function highlightDot(acct){
+  zoomToDot(acct);
+
+  // Remove any existing pulse marker
+  if(_pulseMarker){ map.removeLayer(_pulseMarker); _pulseMarker = null; }
+  hideDotTip();
+
+  // Drop a pulsing ring at the dot's location
+  _pulseMarker = L.marker([acct.la, acct.lo], {
+    icon: L.divIcon({ className:'', html:'<div class="dot-pulse-ring"></div>', iconSize:[32,32], iconAnchor:[16,16] }),
+    interactive: false,
+    zIndexOffset: 9999,
+  }).addTo(map);
+
+  // After the fly animation lands (~650ms), show the tooltip at the dot's screen position
+  setTimeout(() => {
+    const pt   = map.latLngToContainerPoint([acct.la, acct.lo]);
+    const rect = document.getElementById('map').getBoundingClientRect();
+    showDotTip({ clientX: rect.left + pt.x, clientY: rect.top + pt.y }, acct);
+  }, 680);
+
+  // Clean up after animation completes
+  setTimeout(() => {
+    if(_pulseMarker){ map.removeLayer(_pulseMarker); _pulseMarker = null; }
+  }, 2000);
+}
+
+document.getElementById('tableBody').addEventListener('click', e => {
+  if(e.target.closest('.exp-btn')) return;
+  const tr = e.target.closest('tr[data-id]');
+  if(!tr) return;
+  const acct = ACCOUNTS.find(a => a.id === tr.dataset.id);
+  if(acct) highlightDot(acct);
+});
+
+// ── Table header sort ────────────────────────────────────────────
+document.querySelectorAll('#accountTable th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if(tableSort.col === col){
+      tableSort.dir *= -1;
+    } else {
+      tableSort.col = col;
+      tableSort.dir = 1;
+    }
+    currentPage = 0;
+    _updateSortHeaders();
+    renderTable();
+  });
+});
+
 // We catch the map-level click event (fired by Leaflet when the canvas
 // renderer has no marker hit) and hit-test state features via d3.geoContains.
 map.on('click', (e) => {
@@ -1419,8 +2279,15 @@ map.on('click', (e) => {
   });
   // Clicking the already-selected state is a no-op (they're already there);
   // clicking a different state transitions straight to it.
-  if(hitName && hitName !== currentState) selectState(hitName, hitLayer);
+  if(hitName && hitName !== currentState) selectState(hitName);
 });
 </script>
+<div id="state-dash-dropdown">
+  <input id="state-dash-search" class="vp-search" style="background:#1a1a1a;color:rgba(255,255,255,0.8);border-bottom:1px solid rgba(255,255,255,0.12)" placeholder="Search states…" oninput="_filterStateDash(this.value)" autocomplete="off">
+  <div id="state-dash-list" class="vp-list"></div>
+</div>
+<div id="vp-rep-dropdown">
+  <div id="vp-rep-list" class="vp-list"></div>
+</div>
 </body>
 </html>

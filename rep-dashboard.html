@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rep Dashboard — GovWell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f2f5;--surface:#ffffff;--surface-2:#f6f6f6;--surface-3:#eeeeee;
+  --border:#e0e0e0;--border-sub:#ebebeb;--text:#111111;--text-muted:#5e5e5e;--text-faint:#aaaaaa;
+  --card-shadow:0 2px 12px rgba(0,0,0,.08);
+}
+html.dark{
+  --bg:#0d0d0d;--surface:#161616;--surface-2:#1d1d1d;--surface-3:#252525;
+  --border:#303030;--border-sub:#272727;--text:#f0f4f8;--text-muted:#a0aab4;--text-faint:#606874;
+  --card-shadow:0 2px 16px rgba(0,0,0,.4);
+}
+body{font-family:'DM Sans','Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+#header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:46px;background:#0a0a0a;border-bottom:1px solid #222;position:sticky;top:0;z-index:100;gap:10px}
+.header-logo{height:18px;width:auto;flex-shrink:0}
+.header-divider{width:1px;height:14px;background:rgba(255,255,255,0.12);margin:0 2px}
+.subtitle{font-size:10px;color:#555;white-space:nowrap;padding-left:10px;border-left:1px solid #2a2a2a;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.header-left{display:flex;align-items:center;gap:10px;min-width:0}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.hdr-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#000;background:#FEAF0E;text-decoration:none;padding:5px 14px;border-radius:999px;border:none;white-space:nowrap;transition:background .12s}
+.hdr-link:hover{background:#fbbf24}
+.theme-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;transition:all .15s;flex-shrink:0}
+.theme-toggle:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.06)}
+.icon-sun{display:none}.icon-moon{display:block}
+html.dark .icon-sun{display:block}html.dark .icon-moon{display:none}
+
+/* ── Page ── */
+#page{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+
+/* ── Hero ── */
+#hero{margin-bottom:24px}
+#rep-name{font-size:28px;font-weight:700;line-height:1}
+#rep-sub{font-size:12px;color:var(--text-faint);margin-top:5px}
+
+/* ── Stats row ── */
+#stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;flex:1;min-width:140px;box-shadow:var(--card-shadow)}
+.stat-val{font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.stat-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;color:var(--text-faint);margin-top:4px}
+.stat-card.gold .stat-val{color:#FEAF0E}
+.stat-card.red  .stat-val{color:#ef4444}
+.stat-card.blue .stat-val{color:#3b82f6}
+
+/* ── Progress bar (quarterly coverage) ── */
+.qtr-progress{margin-top:8px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.qtr-progress-fill{height:100%;border-radius:2px;background:#FEAF0E;transition:width .4s ease}
+
+/* ── Charts grid ── */
+#charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){#charts-grid{grid-template-columns:1fr}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;box-shadow:var(--card-shadow)}
+.chart-card.wide{grid-column:1/-1}
+.chart-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);margin-bottom:16px;display:flex;align-items:baseline;gap:8px}
+.chart-subtitle{font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-faint)}
+.chart-wrap{position:relative}
+.chart-wrap.donut{max-width:260px;margin:0 auto}
+
+/* ── Attention filters ── */
+#att-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.att-filter-row{display:flex;align-items:center;gap:6px}
+.att-filter-label{font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--text-faint);white-space:nowrap;width:52px;flex-shrink:0}
+.att-pills{display:flex;gap:4px;flex-wrap:wrap}
+.att-pill{font-size:10px;font-weight:600;font-family:inherit;padding:3px 9px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .12s;white-space:nowrap}
+.att-pill:hover{border-color:var(--text-muted);color:var(--text)}
+.att-pill.active{background:#FEAF0E;border-color:#FEAF0E;color:#000}
+.att-select{font-size:10px;font-family:inherit;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);cursor:pointer;outline:none}
+.att-select:focus{border-color:#FEAF0E}
+.att-clear-btn{font-size:10px;font-weight:600;font-family:inherit;padding:3px 9px;border-radius:20px;border:1px solid #ef4444;background:transparent;color:#ef4444;cursor:pointer;transition:all .12s;margin-left:auto}
+.att-clear-btn:hover{background:#ef4444;color:#fff}
+
+/* ── Attention table ── */
+#attention-wrap{max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;margin-top:4px}
+#attention-wrap::-webkit-scrollbar{width:3px}
+#attention-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.att-table{width:100%;border-collapse:collapse;font-size:11px}
+.att-table th{padding:5px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-faint);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);white-space:nowrap}
+.att-th.sortable{cursor:pointer;user-select:none}
+.att-th.sortable:hover{color:var(--text)}
+.att-th.sorted-asc::after{content:' \2191';color:#FEAF0E}
+.att-th.sorted-desc::after{content:' \2193';color:#FEAF0E}
+.att-table td{padding:5px 8px;border-bottom:1px solid var(--border-sub);color:var(--text-muted);vertical-align:middle}
+.att-table tbody tr:hover td{background:var(--surface-2)}
+.att-name{font-weight:500;color:var(--text)}
+.att-last{color:#ef4444;font-weight:600;font-size:10px;white-space:nowrap}
+.att-never{color:#ef4444;font-weight:600;font-size:10px}
+.att-empty{padding:20px;text-align:center;color:var(--text-faint);font-size:12px}
+.tier-pip{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700}
+.st-dot-sm{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:2px}
+.att-exp-col{width:20px;padding:0 4px!important;text-align:center}
+.exp-btn{background:transparent;border:none;cursor:pointer;color:var(--text-faint);font-size:9px;padding:2px 3px;border-radius:3px;transition:color .1s,transform .15s;line-height:1}
+.exp-btn:hover{color:var(--text)}
+.exp-btn.open{transform:rotate(90deg);color:#FEAF0E}
+tr.att-detail:hover td{background:var(--surface-2)!important}
+.att-detail td{background:var(--surface-2)!important;padding:8px 12px!important;vertical-align:top}
+.att-expand{display:flex;flex-direction:column;gap:10px}
+.act-block-label{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);font-weight:700;margin-bottom:4px}
+.rep-breakdown{display:flex;flex-wrap:wrap;gap:5px}
+.rep-chip{font-size:10px;padding:2px 8px;border-radius:12px;background:var(--surface-3);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap}
+.rep-chip strong{color:var(--text);font-weight:600}
+.contact-group{margin-bottom:6px}
+.contact-group-head{font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.contact-group-count{font-weight:400;color:var(--text-faint)}
+.contact-row{display:flex;align-items:baseline;gap:6px;font-size:10px;padding:2px 0;border-bottom:1px solid var(--border-sub)}
+.contact-row:last-child{border-bottom:none}
+.contact-name{font-weight:600;color:var(--text);min-width:130px;flex-shrink:0}
+.contact-title{color:var(--text-muted);flex:1;font-size:10px}
+.contact-last{color:var(--text-faint);font-size:9px;white-space:nowrap}
+.att-tools{display:flex;gap:8px;margin-top:2px;align-items:center}
+.att-sf-link{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#00A1E0;text-decoration:none;padding:3px 8px;border-radius:6px;border:1px solid rgba(0,161,224,0.3);background:rgba(0,161,224,0.08);transition:background .12s}
+.att-sf-link:hover{background:rgba(0,161,224,0.15)}
+
+/* ── Loading / error ── */
+#loading{padding:80px;text-align:center;color:var(--text-faint);font-size:13px}
+#error-msg{display:none;padding:40px;text-align:center;color:#ef4444;font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="header-left">
+    <svg class="header-logo" viewBox="0 0 1372 348" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g clip-path="url(#c)"><path d="M1126.48 176.396H1042V261H1126.48V176.396Z" fill="white"/><path d="M1287 176.395C1233.5 145.936 1179.99 206.855 1126.48 176.395V91.7908C1179.99 122.25 1233.5 61.3317 1287 91.7908C1287 119.992 1287 148.194 1287 176.395Z" fill="white"/></g>
+      <path d="M127.514 252.793C114.592 245.004 104.595 234.228 97.5594 220.476C90.5113 206.725 87 191.135 87 173.744C87 156.354 90.5624 140.764 97.6871 127C104.812 113.248 114.924 102.472 128.025 94.683C141.112 86.8943 156.281 83 173.518 83C192.083 83 207.495 87.2263 219.752 95.6789C232.022 104.132 241.05 115.649 246.846 130.23H215.27C211.619 123.105 206.358 117.474 199.489 113.325C192.607 109.188 183.95 107.107 173.505 107.107C161.235 107.107 150.752 110.171 142.057 116.3C133.362 122.429 126.773 130.562 122.292 140.662C117.81 150.774 115.575 161.793 115.575 173.732C115.575 185.67 117.81 196.689 122.292 206.801C126.761 216.914 133.349 224.996 142.057 231.036C150.752 237.088 161.235 240.114 173.505 240.114C183.452 240.114 192.032 238.122 199.233 234.151C206.435 230.18 212.04 224.537 216.011 217.246C219.995 209.955 222.14 201.426 222.472 191.645H172.254V167.526H249.821V260.76H228.192L225.702 241.365C220.39 248.324 213.304 253.916 204.443 258.143C195.569 262.369 184.933 264.476 172.497 264.476C155.425 264.476 140.423 260.582 127.501 252.793H127.514Z" fill="white"/>
+      <path d="M297.434 255.538C287.321 249.575 279.494 241.365 273.94 230.921C268.386 220.476 265.615 208.883 265.615 196.114C265.615 183.346 268.386 171.753 273.94 161.308C279.494 150.864 287.321 142.666 297.434 136.691C307.546 130.728 319.229 127.74 332.496 127.74C345.762 127.74 357.228 130.728 367.43 136.691C377.632 142.654 385.497 150.864 391.051 161.308C396.605 171.753 399.376 183.346 399.376 196.114C399.376 208.883 396.605 220.476 391.051 230.921C385.497 241.365 377.619 249.563 367.43 255.538C357.241 261.514 345.596 264.489 332.496 264.489C319.395 264.489 307.546 261.501 297.434 255.538ZM354.125 235.773C360.088 231.547 364.57 225.916 367.545 218.868C370.532 211.819 372.014 204.248 372.014 196.114C372.014 187.981 370.52 180.409 367.545 173.361C364.557 166.313 360.088 160.644 354.125 156.328C348.162 152.026 340.948 149.868 332.496 149.868C324.043 149.868 316.829 152.026 310.866 156.328C304.903 160.644 300.422 166.313 297.434 173.361C294.446 180.409 292.965 187.994 292.965 196.114C292.965 204.235 294.459 211.819 297.434 218.868C300.422 225.916 304.891 231.547 310.866 235.773C316.829 239.999 324.043 242.106 332.496 242.106C340.948 242.106 348.162 239.999 354.125 235.773Z" fill="white"/>
+      <path d="M879.924 86.7285H907.274V260.748H879.924V86.7285Z" fill="white"/>
+      <path d="M930.461 86.7285H957.811V260.748H930.461V86.7285Z" fill="white"/>
+      <defs><clipPath id="c"><rect width="245" height="178" fill="white" transform="translate(1042 83)"/></clipPath></defs>
+    </svg>
+    <div class="header-divider"></div>
+    <div class="subtitle" id="header-subtitle">Rep Dashboard</div>
+  </div>
+  <div class="header-right">
+    <a class="hdr-link" href="bdr-map.html">← All Accounts</a>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+      <svg class="icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun"  width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="page">
+  <div id="loading">Loading data...</div>
+  <div id="error-msg"></div>
+  <div id="content" style="display:none">
+    <div id="hero">
+      <div id="rep-name"></div>
+      <div id="rep-sub"></div>
+    </div>
+    <div id="stats-row"></div>
+    <div id="charts-grid">
+
+      <div class="chart-card wide">
+        <div class="chart-title">Activity Coverage — Owned Accounts by Last Touch</div>
+        <div class="chart-wrap"><canvas id="chart-activity"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Tier Distribution <span class="chart-subtitle">owned accounts</span></div>
+        <div class="chart-wrap donut"><canvas id="chart-tiers"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">My Calls by State <span class="chart-subtitle">personal activity</span></div>
+        <div class="chart-wrap"><canvas id="chart-states"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Accounts by State <span class="chart-subtitle">owned accounts</span></div>
+        <div class="chart-wrap"><canvas id="chart-accts-by-state"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Touch Rate by Tier <span class="chart-subtitle">% touched in last 90 days</span></div>
+        <div class="chart-wrap"><canvas id="chart-touch-rate"></canvas></div>
+      </div>
+
+      <div class="chart-card wide">
+        <div class="chart-title">Customers in My Territory <span id="territory-cust-count" class="chart-subtitle"></span></div>
+        <div id="territory-cust-wrap" style="max-height:320px;overflow-y:auto;scrollbar-width:thin;margin-top:4px">
+          <table class="att-table">
+            <thead><tr>
+              <th class="att-exp-col"></th>
+              <th style="width:14px"></th>
+              <th class="att-th">Account</th>
+              <th class="att-th">St</th>
+              <th class="att-th">Owner</th>
+              <th class="att-th" style="text-align:right">ARR</th>
+              <th class="att-th">Legacy</th>
+            </tr></thead>
+            <tbody id="territory-cust-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="chart-card wide">
+        <div class="chart-title">All Accounts <span id="attention-count" class="chart-subtitle"></span></div>
+
+        <div id="att-filters">
+          <div class="att-filter-row">
+            <span class="att-filter-label">Tier</span>
+            <div class="att-pills" id="filter-tier">
+              <button class="att-pill active" data-val="">All</button>
+              <button class="att-pill" data-val="S">S</button>
+              <button class="att-pill" data-val="1">1</button>
+              <button class="att-pill" data-val="2">2</button>
+              <button class="att-pill" data-val="3">3</button>
+            </div>
+          </div>
+          <div class="att-filter-row">
+            <span class="att-filter-label">Type</span>
+            <div class="att-pills" id="filter-et">
+              <button class="att-pill active" data-val="">All</button>
+              <button class="att-pill" data-val="Municipality">Municipality</button>
+              <button class="att-pill" data-val="County">County</button>
+            </div>
+          </div>
+          <div class="att-filter-row">
+            <span class="att-filter-label">Population</span>
+            <select class="att-select" id="filter-pop">
+              <option value="">Any</option>
+              <option value="u5k">Under 5k</option>
+              <option value="5k25k">5k – 25k</option>
+              <option value="25k100k">25k – 100k</option>
+              <option value="o100k">Over 100k</option>
+            </select>
+          </div>
+          <div class="att-filter-row">
+            <span class="att-filter-label">Legacy</span>
+            <div class="att-pills" id="filter-legacy">
+              <button class="att-pill active" data-val="">All</button>
+              <button class="att-pill" data-val="yes">Has Legacy</button>
+              <button class="att-pill" data-val="no">No Legacy</button>
+            </div>
+          </div>
+          <button class="att-clear-btn" id="att-clear-btn" onclick="clearAttFilters()" style="display:none">✕ Clear filters</button>
+        </div>
+
+        <div id="attention-wrap">
+          <table class="att-table">
+            <thead><tr>
+              <th class="att-exp-col"></th>
+              <th style="width:14px"></th>
+              <th class="att-th sortable" data-col="name">Account</th>
+              <th class="att-th sortable" data-col="state">St</th>
+              <th class="att-th sortable" data-col="owner">Owner</th>
+              <th class="att-th sortable" data-col="tier">Tier</th>
+              <th class="att-th sortable" data-col="et">Type</th>
+              <th class="att-th sortable" data-col="pop">Pop</th>
+              <th class="att-th sortable" data-col="leg">Legacy</th>
+              <th class="att-th sortable" data-col="calls" style="text-align:right">Calls</th>
+              <th class="att-th sortable" data-col="last">Last Touch</th>
+            </tr></thead>
+            <tbody id="attention-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Theme ─────────────────────────────────────────────────────────
+function applyTheme(dark){
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('gwTheme', dark ? 'dark' : 'light');
+}
+document.getElementById('themeToggle').addEventListener('click', () => {
+  applyTheme(!document.documentElement.classList.contains('dark'));
+});
+(function(){
+  const saved = localStorage.getItem('gwTheme');
+  applyTheme(saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+})();
+
+function isDark(){ return document.documentElement.classList.contains('dark'); }
+function gridColor(){ return isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)'; }
+function textColor(){ return isDark() ? '#a0aab4' : '#5e5e5e'; }
+
+const STATE_ABBR = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS',
+  'Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA',
+  'Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
+  'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM',
+  'New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
+  'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY',
+  'District of Columbia':'DC'
+};
+
+const TIER_ORDER  = ['S','1','2','3'];
+const TIER_COLORS = {'S':'#fbbf24','1':'#f97316','2':'#3b82f6','3':'#64748b'};
+const TIER_LABELS = {'S':'Tier S','1':'Tier 1','2':'Tier 2','3':'Tier 3'};
+const TIER_BG     = {'S':'rgba(251,191,36,.15)','1':'rgba(249,115,22,.15)','2':'rgba(59,130,246,.15)','3':'rgba(100,116,139,.15)'};
+
+// ── URL param ─────────────────────────────────────────────────────
+const REP = new URLSearchParams(window.location.search).get('rep') || '';
+if(!REP){
+  document.getElementById('loading').style.display = 'none';
+  const e = document.getElementById('error-msg');
+  e.textContent = 'No rep specified. Add ?rep=Name to the URL.';
+  e.style.display = 'block';
+} else {
+  document.title = REP + ' Dashboard — GovWell';
+  document.getElementById('rep-name').textContent = REP;
+  document.getElementById('header-subtitle').textContent = REP;
+
+  let ALL_ACCOUNTS = [];
+
+  Promise.all([
+    fetch('view-config-bdr.json', {cache:'no-store'}).then(r => r.json()),
+    fetch('accounts_data.json',   {cache:'no-store'}).then(r => r.json()),
+  ]).then(([cfg, all]) => {
+    ALL_ACCOUNTS = all;
+
+    const STATUS_COLORS = {};
+    const STATUS_LABELS = {};
+    Object.entries(cfg.statuses||{}).forEach(([k,v]) => {
+      STATUS_COLORS[k] = v.color; STATUS_LABELS[k] = v.label;
+    });
+    STATUS_COLORS['u'] = STATUS_COLORS['u'] || '#94a3b8';
+    STATUS_LABELS['u'] = STATUS_LABELS['u'] || 'Untouched';
+
+    // ── Segment accounts ──────────────────────────────────────────
+    const owned    = all.filter(a => a.o === REP);
+    const calledIn = all.filter(a => a.o !== REP && (a.reps||[]).some(r => r[0] === REP));
+
+    if(!owned.length && !calledIn.length){
+      document.getElementById('loading').style.display = 'none';
+      const e = document.getElementById('error-msg');
+      e.textContent = 'No accounts found for ' + REP + '.';
+      e.style.display = 'block';
+      return;
+    }
+
+    // ── Date helpers ──────────────────────────────────────────────
+    const NOW   = Date.now();
+    const MS30  = 30  * 86400000;
+    const MS90  = 90  * 86400000;
+    const MS365 = 365 * 86400000;
+    function lcdAge(lcd){
+      if(!lcd) return Infinity;
+      const p = lcd.split('-');
+      return NOW - new Date(+p[0], +p[1]-1, +p[2]).getTime();
+    }
+    function fmtDate(d){
+      if(!d) return null;
+      const [y,m,dd] = d.split('-');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return months[+m-1] + ' ' + dd + ', ' + y;
+    }
+
+    // ── Stats aggregation ─────────────────────────────────────────
+    const touchedQtr  = owned.filter(a => lcdAge(a.lcd) <= MS90).length;
+    const qtrPct      = owned.length ? Math.round((touchedQtr / owned.length) * 100) : 0;
+
+    let myCalls = 0;
+    [...owned, ...calledIn].forEach(a => {
+      const entry = (a.reps||[]).find(r => r[0] === REP);
+      if(entry) myCalls += entry[1];
+    });
+
+    const TIER_RANK = {'S':0,'1':1,'2':2,'3':3};
+    const allRepAccounts = [...owned].sort(
+      (a,b) => (TIER_RANK[a.t]??4)-(TIER_RANK[b.t]??4) || (a.a||'').localeCompare(b.a||'')
+    );
+
+    // ── Territory customers (needed for stats row) ─────────────────
+    const repStates = new Set(owned.map(a => a.s).filter(Boolean));
+    const territoryCustomers = all
+      .filter(a => a.st === 'cu' && repStates.has(a.s))
+      .sort((a,b) => (a.s||'').localeCompare(b.s||'') || (a.a||'').localeCompare(b.a||''));
+
+    // ── Stats row ─────────────────────────────────────────────────
+    document.getElementById('rep-sub').textContent =
+      owned.length.toLocaleString() + ' owned accounts · ' +
+      myCalls.toLocaleString() + ' personal calls logged';
+
+    document.getElementById('stats-row').innerHTML = [
+      { val: owned.length.toLocaleString(),
+        lbl: 'Owned Accounts', extra: '' },
+      { val: touchedQtr + ' / ' + owned.length,
+        lbl: 'Touched This Quarter',
+        cls: qtrPct >= 75 ? 'gold' : 'red',
+        bar: qtrPct },
+      { val: myCalls.toLocaleString(),
+        lbl: 'My Total Calls', cls: 'blue' },
+      { val: territoryCustomers.length.toLocaleString(),
+        lbl: 'Territory Customers', cls: 'gold' },
+    ].map(s => {
+      const bar = s.bar != null
+        ? '<div class="qtr-progress"><div class="qtr-progress-fill" style="width:' + s.bar + '%"></div></div>'
+        : '';
+      return '<div class="stat-card' + (s.cls?' '+s.cls:'') + '">' +
+        '<div class="stat-val">' + s.val + '</div>' +
+        '<div class="stat-lbl">' + s.lbl + '</div>' + bar + '</div>';
+    }).join('');
+
+    // ── Charts setup ──────────────────────────────────────────────
+    const dark = isDark();
+    const gc   = gridColor();
+    const tc   = textColor();
+    Chart.defaults.font.family = "'DM Sans','Inter',sans-serif";
+    Chart.defaults.color = tc;
+
+    // 1. Activity Coverage (owned accounts)
+    const actBuckets = [
+      {label:'Last 30 Days', color:'#22c55e', count:0},
+      {label:'Last Quarter', color:'#84cc16', count:0},
+      {label:'Last Year',    color:'#f97316', count:0},
+      {label:'Never / 1yr+', color:'#ef4444', count:0},
+    ];
+    owned.forEach(a => {
+      const age = lcdAge(a.lcd);
+      if(age <= MS30)       actBuckets[0].count++;
+      else if(age <= MS90)  actBuckets[1].count++;
+      else if(age <= MS365) actBuckets[2].count++;
+      else                  actBuckets[3].count++;
+    });
+    const actCanvas = document.getElementById('chart-activity');
+    actCanvas.height = 4 * 40 + 40;
+    new Chart(actCanvas, {
+      type: 'bar',
+      data: {
+        labels: actBuckets.map(b => b.label),
+        datasets: [{
+          data: actBuckets.map(b => b.count),
+          backgroundColor: actBuckets.map(b => b.color),
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {display:false},
+          tooltip: { callbacks: { label: ctx => {
+            const n = ctx.parsed.x;
+            const pct = owned.length ? ((n/owned.length)*100).toFixed(1) : 0;
+            return n.toLocaleString() + ' accounts (' + pct + '%)';
+          }}}
+        },
+        scales: {
+          x: {grid:{color:gc}, ticks:{color:tc, callback:v=>v.toLocaleString()}},
+          y: {grid:{display:false}, ticks:{color:tc}}
+        }
+      }
+    });
+
+    // 2. Tier distribution (owned)
+    const tierCount = {};
+    TIER_ORDER.forEach(t => { tierCount[t] = 0; });
+    owned.forEach(a => { if(a.t) tierCount[a.t] = (tierCount[a.t]||0) + 1; });
+    const tierKeys = TIER_ORDER.filter(t => tierCount[t] > 0);
+    new Chart(document.getElementById('chart-tiers'), {
+      type: 'doughnut',
+      data: {
+        labels: tierKeys.map(t => TIER_LABELS[t]),
+        datasets: [{
+          data: tierKeys.map(t => tierCount[t]),
+          backgroundColor: tierKeys.map(t => TIER_COLORS[t]),
+          borderColor: dark ? '#161616' : '#ffffff',
+          borderWidth: 2, hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive:true, cutout:'62%',
+        plugins: { legend: { position:'bottom', labels:{color:tc,padding:14,boxWidth:10,font:{size:11}} } }
+      }
+    });
+
+    // 3. My calls by state
+    const stateCallMap = {};
+    [...owned, ...calledIn].forEach(a => {
+      const entry = (a.reps||[]).find(r => r[0] === REP);
+      if(entry && a.s){
+        stateCallMap[a.s] = (stateCallMap[a.s]||0) + entry[1];
+      }
+    });
+    const stateEntries = Object.entries(stateCallMap)
+      .sort((a,b) => b[1]-a[1])
+      .filter(([,v]) => v > 0);
+    const stateCanvas = document.getElementById('chart-states');
+    stateCanvas.height = Math.max(120, stateEntries.length * 30);
+    new Chart(stateCanvas, {
+      type: 'bar',
+      data: {
+        labels: stateEntries.map(([s]) => STATE_ABBR[s] || s),
+        datasets: [{
+          data: stateEntries.map(([,v]) => v),
+          backgroundColor: '#FEAF0E',
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: {display:false} },
+        scales: {
+          x: {grid:{color:gc}, ticks:{color:tc}},
+          y: {grid:{display:false}, ticks:{color:tc}}
+        }
+      }
+    });
+
+    // 4. Accounts by State (owned)
+    const acctsByState = {};
+    owned.forEach(a => {
+      const abbr = STATE_ABBR[a.s] || a.s;
+      if(abbr) acctsByState[abbr] = (acctsByState[abbr] || 0) + 1;
+    });
+    const acctStateEntries = Object.entries(acctsByState)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 20);
+    const acctStateCanvas = document.getElementById('chart-accts-by-state');
+    acctStateCanvas.height = Math.max(120, acctStateEntries.length * 28);
+    new Chart(acctStateCanvas, {
+      type: 'bar',
+      data: {
+        labels: acctStateEntries.map(([s]) => s),
+        datasets: [{
+          data: acctStateEntries.map(([,v]) => v),
+          backgroundColor: '#818cf8',
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: {display:false} },
+        scales: {
+          x: { grid:{color:gc}, ticks:{color:tc, precision:0} },
+          y: { grid:{display:false}, ticks:{color:tc} }
+        }
+      }
+    });
+
+    // 5. Touch Rate by Tier
+    const tierOrder = ['S', '1', '2', '3'];
+    const tierStats = tierOrder.map(t => {
+      const accts   = owned.filter(a => a.t === t);
+      const touched = accts.filter(a => lcdAge(a.lcd) <= MS90).length;
+      const pct     = accts.length ? Math.round(touched / accts.length * 100) : 0;
+      return { tier: t, total: accts.length, touched, pct };
+    }).filter(d => d.total > 0);
+
+    const touchCanvas = document.getElementById('chart-touch-rate');
+    touchCanvas.height = Math.max(80, tierStats.length * 52);
+    new Chart(touchCanvas, {
+      type: 'bar',
+      data: {
+        labels: tierStats.map(d => 'Tier ' + d.tier),
+        datasets: [{
+          data: tierStats.map(d => d.pct),
+          backgroundColor: tierStats.map(d =>
+            d.pct >= 75 ? '#22c55e' :
+            d.pct >= 50 ? '#facc15' :
+            d.pct >= 25 ? '#f97316' : '#ef4444'
+          ),
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const d = tierStats[ctx.dataIndex];
+                return ' ' + d.touched + ' of ' + d.total + ' accounts (' + d.pct + '%)';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            min: 0, max: 100,
+            grid: { color: gc },
+            ticks: { color: tc, callback: v => v + '%' }
+          },
+          y: { grid: { display: false }, ticks: { color: tc, font: { weight: '700' } } }
+        }
+      }
+    });
+
+    // 6. Customers in My Territory
+
+    document.getElementById('territory-cust-count').textContent =
+      territoryCustomers.length
+        ? territoryCustomers.length.toLocaleString() + ' customers across ' + repStates.size + ' states'
+        : 'No customers in territory states';
+
+    const tcBody = document.getElementById('territory-cust-body');
+    if(!territoryCustomers.length){
+      tcBody.innerHTML = '<tr><td colspan="7" class="att-empty">No customers found in your territory states.</td></tr>';
+    } else {
+      tcBody.innerHTML = territoryCustomers.map(a => {
+        const abbr   = STATE_ABBR[a.s] || a.s || '';
+        const arrStr = a.arr ? '$' + a.arr.toLocaleString() : '—';
+        const leg    = a.leg
+          ? '<span title="' + a.leg + '" style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom">' + a.leg + '</span>'
+          : '<span style="color:var(--text-faint);font-size:10px">—</span>';
+        const isOwned = a.o === REP;
+        const ownerStyle = isOwned ? 'color:#FEAF0E;font-weight:700' : 'color:var(--text-muted)';
+        const hasAct = (a.reps && a.reps.length > 0) || (a.contacts && a.contacts.length > 0);
+        const expBtn = hasAct ? '<button class="exp-btn" data-id="' + a.id + '">▶</button>' : '';
+        return '<tr data-id="' + a.id + '">' +
+          '<td class="att-exp-col">' + expBtn + '</td>' +
+          '<td><span class="st-dot-sm" style="background:#fbbf24"></span></td>' +
+          '<td class="att-name" title="' + a.a + '">★ ' + a.a + '</td>' +
+          '<td style="color:var(--text-faint);font-size:10px;white-space:nowrap">' + abbr + '</td>' +
+          '<td style="font-size:10px;' + ownerStyle + '">' + (a.o||'—') + '</td>' +
+          '<td style="text-align:right;font-size:10px;font-variant-numeric:tabular-nums;color:#fbbf24;font-weight:600">' + arrStr + '</td>' +
+          '<td>' + leg + '</td>' +
+          '</tr>';
+      }).join('');
+
+      tcBody.querySelectorAll('.exp-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          const tr = btn.closest('tr');
+          const isOpen = btn.classList.contains('open');
+          document.querySelectorAll('.att-detail').forEach(d => d.remove());
+          document.querySelectorAll('.exp-btn.open').forEach(b => b.classList.remove('open'));
+          if(!isOpen){
+            btn.classList.add('open');
+            const acct = ALL_ACCOUNTS.find(a => a.id === id);
+            const detail = document.createElement('tr');
+            detail.className = 'att-detail';
+            detail.innerHTML = '<td colspan="7">' + buildExpandPane(acct) + '</td>';
+            tr.after(detail);
+          }
+        });
+      });
+    }
+
+    // 6. Accounts table — filter + sort state
+    let attSort   = { col: null, dir: 1 };
+    let attFilters = { tier: '', et: '', pop: '', legacy: '' };
+
+    const FN_ORDER  = ['bp','pz','ce','ot'];
+    const FN_LABELS = { bp:'Building / Permitting', pz:'Planning & Zoning', ce:'Code Enforcement', ot:'Other' };
+
+    function buildExpandPane(a){
+      if(!a) return '';
+      const sections = [];
+      if(a.reps && a.reps.length){
+        const chips = a.reps.map(([name, n]) =>
+          '<span class="rep-chip"><strong>' + name + '</strong> · ' + n + '</span>'
+        ).join('');
+        sections.push('<div><div class="act-block-label">Call breakdown — ' + (a.tc||0) + ' total</div><div class="rep-breakdown">' + chips + '</div></div>');
+      }
+      if(a.contacts && a.contacts.length){
+        const byFn = { bp:[], pz:[], ce:[], ot:[] };
+        a.contacts.forEach(c => { if(byFn[c[2]]) byFn[c[2]].push(c); });
+        const groups = FN_ORDER.filter(fn => byFn[fn].length).map(fn => {
+          const rows = byFn[fn].map(([name, title,, last]) => {
+            const lastStr = last ? '<span class="contact-last">' + fmtDate(last) + '</span>' : '';
+            return '<div class="contact-row"><span class="contact-name">' + name + '</span><span class="contact-title">' + (title||'—') + '</span>' + lastStr + '</div>';
+          }).join('');
+          return '<div class="contact-group"><div class="contact-group-head">' + FN_LABELS[fn] + ' <span class="contact-group-count">' + byFn[fn].length + '</span></div>' + rows + '</div>';
+        }).join('');
+        sections.push('<div><div class="act-block-label">Contacts</div>' + groups + '</div>');
+      }
+      const sfUrl = 'https://govwell.lightning.force.com/lightning/r/Account/' + a.id + '/view';
+      sections.push('<div class="att-tools"><a class="att-sf-link" href="' + sfUrl + '" target="_blank" rel="noopener">↗ Salesforce</a></div>');
+      return '<div class="att-expand">' + sections.join('') + '</div>';
+    }
+
+    function popBucket(pop){
+      if(!pop) return null;
+      if(pop < 5000)   return 'u5k';
+      if(pop < 25000)  return '5k25k';
+      if(pop < 100000) return '25k100k';
+      return 'o100k';
+    }
+
+    function renderAttentionTable(){
+      let rows = allRepAccounts.filter(a => {
+        if(attFilters.tier   && a.t !== attFilters.tier) return false;
+        if(attFilters.et     && a.et !== attFilters.et)  return false;
+        if(attFilters.pop    && popBucket(a.pop) !== attFilters.pop) return false;
+        if(attFilters.legacy === 'yes' && !a.leg) return false;
+        if(attFilters.legacy === 'no'  &&  a.leg) return false;
+        return true;
+      });
+
+      if(attSort.col){
+        const d = attSort.dir;
+        rows = [...rows].sort((a, b) => {
+          switch(attSort.col){
+            case 'name':  return d * (a.a||'').localeCompare(b.a||'');
+            case 'state': return d * (a.s||'').localeCompare(b.s||'');
+            case 'tier': {
+              const m = {'S':0,'1':1,'2':2,'3':3};
+              return d * ((m[a.t]??4) - (m[b.t]??4));
+            }
+            case 'et': return d * (a.et||'').localeCompare(b.et||'');
+            case 'pop':
+              if(!a.pop && !b.pop) return 0;
+              if(!a.pop) return 1; if(!b.pop) return -1;
+              return d * (a.pop - b.pop);
+            case 'leg': return d * (a.leg||'').localeCompare(b.leg||'');
+            case 'owner': return d * (a.o||'').localeCompare(b.o||'');
+            case 'calls':
+              if(!a.tc && !b.tc) return 0;
+              if(!a.tc) return 1; if(!b.tc) return -1;
+              return d * (a.tc - b.tc);
+            case 'last':
+              if(!a.lcd && !b.lcd) return 0;
+              if(!a.lcd) return 1; if(!b.lcd) return -1;
+              return d * a.lcd.localeCompare(b.lcd);
+          }
+          return 0;
+        });
+      }
+
+      // Update header sort indicators
+      document.querySelectorAll('.att-th[data-col]').forEach(th => {
+        th.classList.remove('sorted-asc','sorted-desc');
+        if(th.dataset.col === attSort.col)
+          th.classList.add(attSort.dir === 1 ? 'sorted-asc' : 'sorted-desc');
+      });
+
+      const total = allRepAccounts.length;
+      document.getElementById('attention-count').textContent =
+        rows.length === total
+          ? total.toLocaleString() + ' accounts'
+          : rows.length.toLocaleString() + ' of ' + total.toLocaleString();
+
+      const tbody = document.getElementById('attention-body');
+      if(!rows.length){
+        tbody.innerHTML = '<tr><td colspan="11" class="att-empty">No accounts match the current filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(a => {
+        const dotColor = STATUS_COLORS[a.st] || '#94a3b8';
+        const dot  = '<span class="st-dot-sm" style="background:' + dotColor + '"></span>';
+        const abbr = STATE_ABBR[a.s] || a.s || '';
+        const tb   = TIER_BG[a.t]||'transparent', tc3 = TIER_COLORS[a.t]||'inherit';
+        const tier = '<span class="tier-pip" style="background:' + tb + ';color:' + tc3 + '">T' + (a.t||'?') + '</span>';
+        const pop  = a.pop ? a.pop.toLocaleString() : '—';
+        const leg  = a.leg ? '<span title="' + a.leg + '" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom;font-size:10px">' + a.leg + '</span>' : '<span style="color:var(--text-faint);font-size:10px">—</span>';
+        const etLabel = a.et ? '<span style="font-size:10px">' + (a.et === 'Municipality' ? 'Muni' : a.et) + '</span>' : '—';
+        const last = a.lcd
+          ? '<span class="att-last">' + fmtDate(a.lcd) + '</span>'
+          : '<span class="att-never">Never</span>';
+        const hasAct = (a.reps && a.reps.length > 0) || (a.contacts && a.contacts.length > 0);
+        const expBtn = hasAct ? '<button class="exp-btn" data-id="' + a.id + '">▶</button>' : '';
+        const callsCell = a.tc != null ? a.tc : '—';
+        const ownerStr = a.o ? '<span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:90px;vertical-align:bottom" title="' + a.o + '">' + a.o.split(' ')[0] + '</span>' : '—';
+        return '<tr data-id="' + a.id + '"><td class="att-exp-col">' + expBtn + '</td>' +
+          '<td>' + dot + '</td>' +
+          '<td class="att-name" title="' + a.a + '">' + a.a + '</td>' +
+          '<td style="color:var(--text-faint);font-size:10px;white-space:nowrap">' + abbr + '</td>' +
+          '<td>' + ownerStr + '</td>' +
+          '<td>' + tier + '</td>' +
+          '<td>' + etLabel + '</td>' +
+          '<td style="text-align:right;font-size:10px;font-variant-numeric:tabular-nums;color:var(--text-muted)">' + pop + '</td>' +
+          '<td>' + leg + '</td>' +
+          '<td style="text-align:right;font-size:10px;font-variant-numeric:tabular-nums;color:var(--text-muted)">' + callsCell + '</td>' +
+          '<td>' + last + '</td></tr>';
+      }).join('');
+
+      tbody.querySelectorAll('.exp-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          const tr = btn.closest('tr');
+          const isOpen = btn.classList.contains('open');
+          document.querySelectorAll('.att-detail').forEach(d => d.remove());
+          document.querySelectorAll('.exp-btn.open').forEach(b => b.classList.remove('open'));
+          if(!isOpen){
+            btn.classList.add('open');
+            const acct = ALL_ACCOUNTS.find(a => a.id === id);
+            const detail = document.createElement('tr');
+            detail.className = 'att-detail';
+            detail.innerHTML = '<td colspan="11">' + buildExpandPane(acct) + '</td>';
+            tr.after(detail);
+          }
+        });
+      });
+    }
+
+    // Wire filter pills
+    document.querySelectorAll('#filter-tier .att-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filter-tier .att-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        attFilters.tier = btn.dataset.val;
+        updateClearBtn(); renderAttentionTable();
+      });
+    });
+    document.querySelectorAll('#filter-et .att-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filter-et .att-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        attFilters.et = btn.dataset.val;
+        updateClearBtn(); renderAttentionTable();
+      });
+    });
+    document.querySelectorAll('#filter-legacy .att-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filter-legacy .att-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        attFilters.legacy = btn.dataset.val;
+        updateClearBtn(); renderAttentionTable();
+      });
+    });
+    document.getElementById('filter-pop').addEventListener('change', function(){
+      attFilters.pop = this.value;
+      updateClearBtn(); renderAttentionTable();
+    });
+
+    // Wire sort headers
+    document.querySelectorAll('.att-th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        attSort.dir = attSort.col === col ? attSort.dir * -1 : 1;
+        attSort.col = col;
+        renderAttentionTable();
+      });
+    });
+
+    function updateClearBtn(){
+      const active = attFilters.tier || attFilters.et || attFilters.pop || attFilters.legacy;
+      document.getElementById('att-clear-btn').style.display = active ? 'block' : 'none';
+    }
+
+    window.clearAttFilters = function(){
+      attFilters = { tier:'', et:'', pop:'', legacy:'' };
+      document.querySelectorAll('.att-pill').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.att-pills').forEach(g => {
+        const first = g.querySelector('[data-val=""]');
+        if(first) first.classList.add('active');
+      });
+      document.getElementById('filter-pop').value = '';
+      document.getElementById('att-clear-btn').style.display = 'none';
+      renderAttentionTable();
+    };
+
+    renderAttentionTable();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+  }).catch(err => {
+    document.getElementById('loading').style.display = 'none';
+    const e = document.getElementById('error-msg');
+    e.textContent = 'Failed to load data: ' + err.message;
+    e.style.display = 'block';
+  });
+}
+</script>
+</body>
+</html>

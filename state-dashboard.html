@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>State Dashboard — GovWell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:        #f0f2f5;
+  --surface:   #ffffff;
+  --surface-2: #f6f6f6;
+  --surface-3: #eeeeee;
+  --border:    #e0e0e0;
+  --text:      #111111;
+  --text-muted:#5e5e5e;
+  --text-faint:#aaaaaa;
+  --card-shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+html.dark{
+  --bg:        #0d0d0d;
+  --surface:   #161616;
+  --surface-2: #1d1d1d;
+  --surface-3: #252525;
+  --border:    #303030;
+  --text:      #f0f4f8;
+  --text-muted:#a0aab4;
+  --text-faint:#606874;
+  --card-shadow: 0 2px 16px rgba(0,0,0,.4);
+}
+
+body{font-family:'DM Sans','Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+#header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:46px;background:#0a0a0a;border-bottom:1px solid #222;position:sticky;top:0;z-index:100;gap:10px}
+.header-logo{height:18px;width:auto;flex-shrink:0}
+.header-divider{width:1px;height:14px;background:rgba(255,255,255,0.12);margin:0 2px}
+.subtitle{font-size:10px;color:#555;white-space:nowrap;padding-left:10px;border-left:1px solid #2a2a2a}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-right{display:flex;align-items:center;gap:8px}
+.hdr-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#000;background:#FEAF0E;text-decoration:none;padding:5px 14px;border-radius:999px;border:none;white-space:nowrap;transition:background .12s}
+.hdr-link:hover{background:#fbbf24}
+.theme-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.5);cursor:pointer;transition:all .15s;flex-shrink:0}
+.theme-toggle:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.06)}
+.icon-sun{display:none}.icon-moon{display:block}
+html.dark .icon-sun{display:block}html.dark .icon-moon{display:none}
+
+/* ── Page ── */
+#page{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+
+/* ── Hero ── */
+#hero{margin-bottom:24px}
+#state-name{font-size:28px;font-weight:700;color:var(--text);line-height:1}
+#state-sub{font-size:12px;color:var(--text-faint);margin-top:5px}
+
+/* ── Stats row ── */
+#stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;flex:1;min-width:130px;box-shadow:var(--card-shadow)}
+.stat-val{font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.stat-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;color:var(--text-faint);margin-top:4px}
+.stat-card.highlight .stat-val{color:#FEAF0E}
+
+/* ── Charts grid ── */
+#charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){#charts-grid{grid-template-columns:1fr}}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;box-shadow:var(--card-shadow)}
+.chart-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);margin-bottom:16px}
+.chart-wrap{position:relative}
+.chart-wrap.donut{max-width:260px;margin:0 auto}
+.chart-wrap.bar canvas{width:100% !important}
+
+/* ── Wide card ── */
+.chart-card.wide{grid-column:1/-1}
+
+/* ── Loading / error ── */
+#loading{padding:80px;text-align:center;color:var(--text-faint);font-size:13px}
+#error-msg{display:none;padding:40px;text-align:center;color:#ef4444;font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="header-left">
+    <svg class="header-logo" viewBox="0 0 1372 348" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g clip-path="url(#c)"><path d="M1126.48 176.396H1042V261H1126.48V176.396Z" fill="white"/><path d="M1287 176.395C1233.5 145.936 1179.99 206.855 1126.48 176.395V91.7908C1179.99 122.25 1233.5 61.3317 1287 91.7908C1287 119.992 1287 148.194 1287 176.395Z" fill="white"/></g>
+      <path d="M127.514 252.793C114.592 245.004 104.595 234.228 97.5594 220.476C90.5113 206.725 87 191.135 87 173.744C87 156.354 90.5624 140.764 97.6871 127C104.812 113.248 114.924 102.472 128.025 94.683C141.112 86.8943 156.281 83 173.518 83C192.083 83 207.495 87.2263 219.752 95.6789C232.022 104.132 241.05 115.649 246.846 130.23H215.27C211.619 123.105 206.358 117.474 199.489 113.325C192.607 109.188 183.95 107.107 173.505 107.107C161.235 107.107 150.752 110.171 142.057 116.3C133.362 122.429 126.773 130.562 122.292 140.662C117.81 150.774 115.575 161.793 115.575 173.732C115.575 185.67 117.81 196.689 122.292 206.801C126.761 216.914 133.349 224.996 142.057 231.036C150.752 237.088 161.235 240.114 173.505 240.114C183.452 240.114 192.032 238.122 199.233 234.151C206.435 230.18 212.04 224.537 216.011 217.246C219.995 209.955 222.14 201.426 222.472 191.645H172.254V167.526H249.821V260.76H228.192L225.702 241.365C220.39 248.324 213.304 253.916 204.443 258.143C195.569 262.369 184.933 264.476 172.497 264.476C155.425 264.476 140.423 260.582 127.501 252.793H127.514Z" fill="white"/>
+      <path d="M297.434 255.538C287.321 249.575 279.494 241.365 273.94 230.921C268.386 220.476 265.615 208.883 265.615 196.114C265.615 183.346 268.386 171.753 273.94 161.308C279.494 150.864 287.321 142.666 297.434 136.691C307.546 130.728 319.229 127.74 332.496 127.74C345.762 127.74 357.228 130.728 367.43 136.691C377.632 142.654 385.497 150.864 391.051 161.308C396.605 171.753 399.376 183.346 399.376 196.114C399.376 208.883 396.605 220.476 391.051 230.921C385.497 241.365 377.619 249.563 367.43 255.538C357.241 261.514 345.596 264.489 332.496 264.489C319.395 264.489 307.546 261.501 297.434 255.538ZM354.125 235.773C360.088 231.547 364.57 225.916 367.545 218.868C370.532 211.819 372.014 204.248 372.014 196.114C372.014 187.981 370.52 180.409 367.545 173.361C364.557 166.313 360.088 160.644 354.125 156.328C348.162 152.026 340.948 149.868 332.496 149.868C324.043 149.868 316.829 152.026 310.866 156.328C304.903 160.644 300.422 166.313 297.434 173.361C294.446 180.409 292.965 187.994 292.965 196.114C292.965 204.235 294.459 211.819 297.434 218.868C300.422 225.916 304.891 231.547 310.866 235.773C316.829 239.999 324.043 242.106 332.496 242.106C340.948 242.106 348.162 239.999 354.125 235.773Z" fill="white"/>
+      <path d="M879.924 86.7285H907.274V260.748H879.924V86.7285Z" fill="white"/>
+      <path d="M930.461 86.7285H957.811V260.748H930.461V86.7285Z" fill="white"/>
+      <defs><clipPath id="c"><rect width="245" height="178" fill="white" transform="translate(1042 83)"/></clipPath></defs>
+    </svg>
+    <div class="header-divider"></div>
+    <div class="subtitle" id="header-subtitle">State Dashboard</div>
+  </div>
+  <div class="header-right">
+    <a class="hdr-link" href="bdr-map.html">← All Accounts</a>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+      <svg class="icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="page">
+  <div id="loading">Loading data...</div>
+  <div id="error-msg"></div>
+  <div id="content" style="display:none">
+    <div id="hero">
+      <div id="state-name"></div>
+      <div id="state-sub"></div>
+    </div>
+    <div id="stats-row"></div>
+    <div id="charts-grid">
+      <div class="chart-card wide">
+        <div class="chart-title">Call Volume by Rep</div>
+        <div class="chart-wrap bar"><canvas id="chart-reps"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Pipeline Status</div>
+        <div class="chart-wrap donut"><canvas id="chart-status"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Tier Distribution</div>
+        <div class="chart-wrap donut"><canvas id="chart-tiers"></canvas></div>
+      </div>
+      <div class="chart-card wide">
+        <div class="chart-title">Accounts by Owner</div>
+        <div class="chart-wrap bar"><canvas id="chart-owners"></canvas></div>
+      </div>
+      <div class="chart-card wide">
+        <div class="chart-title">Activity Coverage — Accounts by Last Touch</div>
+        <div class="chart-wrap bar"><canvas id="chart-activity"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Theme ─────────────────────────────────────────────────────────
+function applyTheme(dark){
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('gwTheme', dark ? 'dark' : 'light');
+}
+document.getElementById('themeToggle').addEventListener('click', () => {
+  applyTheme(!document.documentElement.classList.contains('dark'));
+});
+(function(){
+  const saved = localStorage.getItem('gwTheme');
+  applyTheme(saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+})();
+
+// ── Helpers ───────────────────────────────────────────────────────
+function isDark(){ return document.documentElement.classList.contains('dark'); }
+function gridColor(){ return isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)'; }
+function textColor(){ return isDark() ? '#a0aab4' : '#5e5e5e'; }
+
+const TIER_ORDER  = ['S','1','2','3'];
+const TIER_COLORS = { 'S':'#fbbf24','1':'#f97316','2':'#3b82f6','3':'#64748b' };
+const TIER_LABELS = { 'S':'Tier S','1':'Tier 1','2':'Tier 2','3':'Tier 3' };
+
+// ── URL param ─────────────────────────────────────────────────────
+const STATE = new URLSearchParams(window.location.search).get('state') || '';
+if(!STATE){
+  document.getElementById('loading').style.display = 'none';
+  const e = document.getElementById('error-msg');
+  e.textContent = 'No state specified. Add ?state=California to the URL.';
+  e.style.display = 'block';
+} else {
+  document.title = STATE + ' Dashboard — GovWell';
+  document.getElementById('state-name').textContent = STATE;
+  document.getElementById('header-subtitle').textContent = STATE;
+
+  Promise.all([
+    fetch('view-config-bdr.json', {cache: 'no-store'}).then(r => r.json()),
+    fetch('accounts_data.json',   {cache: 'no-store'}).then(r => r.json()),
+  ]).then(([cfg, all]) => {
+    const STATUS_COLORS = {};
+    const STATUS_LABELS = {};
+    const STATUS_ORDER  = Object.entries(cfg.statuses)
+      .sort((a,b) => (b[1].priority||0) - (a[1].priority||0))
+      .map(([k]) => k);
+    Object.entries(cfg.statuses).forEach(([k,v]) => {
+      STATUS_COLORS[k] = v.color;
+      STATUS_LABELS[k] = v.label;
+    });
+    STATUS_COLORS['u'] = STATUS_COLORS['u'] || '#94a3b8';
+    STATUS_LABELS['u'] = STATUS_LABELS['u'] || 'Untouched';
+
+    const accounts = all.filter(a => a.s === STATE);
+    if(!accounts.length){
+      document.getElementById('loading').style.display = 'none';
+      const e = document.getElementById('error-msg');
+      e.textContent = 'No accounts found for ' + STATE + '.';
+      e.style.display = 'block';
+      return;
+    }
+
+    // ── Aggregate data ─────────────────────────────────────────────
+    const totalCalls = accounts.reduce((s,a) => s + (a.tc||0), 0);
+    const customers  = accounts.filter(a => a.st === 'cu').length;
+    const pipeline   = accounts.filter(a => ['mf','tf'].includes(a.st)).length;
+
+    // Rep call volume
+    const repCalls = {};
+    accounts.forEach(a => {
+      (a.reps||[]).forEach(([name, n]) => {
+        repCalls[name] = (repCalls[name]||0) + n;
+      });
+    });
+    const repEntries = Object.entries(repCalls).sort((a,b) => b[1]-a[1]);
+
+    // Status breakdown
+    const statusCount = {};
+    STATUS_ORDER.forEach(k => { statusCount[k] = 0; });
+    statusCount['u'] = 0;
+    accounts.forEach(a => { statusCount[a.st||'u'] = (statusCount[a.st||'u']||0) + 1; });
+
+    // Tier breakdown
+    const tierCount = {};
+    TIER_ORDER.forEach(t => { tierCount[t] = 0; });
+    accounts.forEach(a => { if(a.t) tierCount[a.t] = (tierCount[a.t]||0) + 1; });
+
+    // Owner breakdown
+    const ownerCount = {};
+    accounts.forEach(a => { if(a.o) ownerCount[a.o] = (ownerCount[a.o]||0) + 1; });
+    const ownerEntries = Object.entries(ownerCount).sort((a,b) => b[1]-a[1]);
+
+    // Activity coverage — exclusive time buckets
+    const NOW = Date.now();
+    function lcdAge(lcd){
+      if(!lcd) return Infinity;
+      const p = lcd.split('-');
+      return NOW - new Date(+p[0], +p[1]-1, +p[2]).getTime();
+    }
+    const MS30  = 30  * 86400000;
+    const MS90  = 90  * 86400000;
+    const MS365 = 365 * 86400000;
+    const activityBuckets = [
+      { label: 'Last 30 Days',   color: '#22c55e', count: 0 },
+      { label: 'Last Quarter',   color: '#84cc16', count: 0 },
+      { label: 'Last Year',      color: '#f97316', count: 0 },
+      { label: 'Never / 1yr+',  color: '#ef4444', count: 0 },
+    ];
+    accounts.forEach(a => {
+      const age = lcdAge(a.lcd);
+      if(age <= MS30)       activityBuckets[0].count++;
+      else if(age <= MS90)  activityBuckets[1].count++;
+      else if(age <= MS365) activityBuckets[2].count++;
+      else                  activityBuckets[3].count++;
+    });
+
+    // ── Stats row ──────────────────────────────────────────────────
+    document.getElementById('state-sub').textContent =
+      accounts.length.toLocaleString() + ' accounts · ' + totalCalls.toLocaleString() + ' total calls logged';
+
+    const statsData = [
+      { val: accounts.length.toLocaleString(), lbl: 'Total Accounts' },
+      { val: totalCalls.toLocaleString(),      lbl: 'Total Calls Logged', highlight: true },
+      { val: pipeline.toLocaleString(),         lbl: 'Active Pipeline' },
+      { val: customers.toLocaleString(),        lbl: 'Won / Customers' },
+    ];
+    document.getElementById('stats-row').innerHTML = statsData.map(s =>
+      '<div class="stat-card' + (s.highlight?' highlight':'') + '">' +
+      '<div class="stat-val">' + s.val + '</div>' +
+      '<div class="stat-lbl">' + s.lbl + '</div></div>'
+    ).join('');
+
+    // ── Charts ─────────────────────────────────────────────────────
+    const dark = isDark();
+    const gc = gridColor();
+    const tc = textColor();
+
+    Chart.defaults.font.family = "'DM Sans', 'Inter', sans-serif";
+    Chart.defaults.color = tc;
+
+    // 1. Rep call volume — horizontal bar
+    const repCanvas = document.getElementById('chart-reps');
+    repCanvas.height = Math.max(180, repEntries.length * 32);
+    new Chart(repCanvas, {
+      type: 'bar',
+      data: {
+        labels: repEntries.map(([n]) => n),
+        datasets: [{
+          data: repEntries.map(([,v]) => v),
+          backgroundColor: '#FEAF0E',
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: gc }, ticks: { color: tc } },
+          y: { grid: { display: false }, ticks: { color: tc } }
+        }
+      }
+    });
+
+    // 2. Pipeline status — doughnut
+    const statusKeys = [...STATUS_ORDER, 'u'].filter(k => statusCount[k] > 0);
+    new Chart(document.getElementById('chart-status'), {
+      type: 'doughnut',
+      data: {
+        labels: statusKeys.map(k => STATUS_LABELS[k] || k),
+        datasets: [{
+          data: statusKeys.map(k => statusCount[k]),
+          backgroundColor: statusKeys.map(k => STATUS_COLORS[k]),
+          borderColor: dark ? '#161616' : '#ffffff',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '62%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: tc, padding: 14, boxWidth: 10, font: { size: 11 } }
+          }
+        }
+      }
+    });
+
+    // 3. Tier distribution — doughnut
+    const tierKeys = TIER_ORDER.filter(t => tierCount[t] > 0);
+    new Chart(document.getElementById('chart-tiers'), {
+      type: 'doughnut',
+      data: {
+        labels: tierKeys.map(t => TIER_LABELS[t]),
+        datasets: [{
+          data: tierKeys.map(t => tierCount[t]),
+          backgroundColor: tierKeys.map(t => TIER_COLORS[t]),
+          borderColor: dark ? '#161616' : '#ffffff',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '62%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: tc, padding: 14, boxWidth: 10, font: { size: 11 } }
+          }
+        }
+      }
+    });
+
+    // 4. Owner breakdown — horizontal bar
+    const ownerCanvas = document.getElementById('chart-owners');
+    ownerCanvas.height = Math.max(180, ownerEntries.length * 32);
+    new Chart(ownerCanvas, {
+      type: 'bar',
+      data: {
+        labels: ownerEntries.map(([n]) => n),
+        datasets: [{
+          data: ownerEntries.map(([,v]) => v),
+          backgroundColor: '#3b82f6',
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: gc }, ticks: { color: tc } },
+          y: { grid: { display: false }, ticks: { color: tc } }
+        }
+      }
+    });
+
+    // 5. Activity coverage — horizontal bar, color-coded by recency
+    const actCanvas = document.getElementById('chart-activity');
+    actCanvas.height = 4 * 40 + 40;
+    new Chart(actCanvas, {
+      type: 'bar',
+      data: {
+        labels: activityBuckets.map(b => b.label),
+        datasets: [{
+          data: activityBuckets.map(b => b.count),
+          backgroundColor: activityBuckets.map(b => b.color),
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const count = ctx.parsed.x;
+                const pct   = ((count / accounts.length) * 100).toFixed(1);
+                return count.toLocaleString() + ' accounts (' + pct + '%)';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: gc },
+            ticks: {
+              color: tc,
+              callback: v => v.toLocaleString()
+            }
+          },
+          y: { grid: { display: false }, ticks: { color: tc } }
+        }
+      }
+    });
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+  }).catch(err => {
+    document.getElementById('loading').style.display = 'none';
+    const e = document.getElementById('error-msg');
+    e.textContent = 'Failed to load data: ' + err.message;
+    e.style.display = 'block';
+  });
+}
+</script>
+</body>
+</html>

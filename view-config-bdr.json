@@ -2,32 +2,42 @@
   "viewId": "bdr",
   "ownerLabel": "BDR",
   "statuses": {
-    "cu": { "label": "Customer",         "color": "#fbbf24", "symbol": "star",     "priority": 10 },
-    "vb": { "label": "Verbal",           "color": "#22c55e", "symbol": "diamond2", "priority": 9  },
-    "pr": { "label": "Proposal",         "color": "#f97316", "symbol": "triangle", "priority": 8  },
-    "dm": { "label": "Demo",             "color": "#c084fc", "symbol": "square",   "priority": 7  },
-    "sq": { "label": "Sales Qualified",  "color": "#00e5ff", "symbol": "asterisk", "priority": 6  },
-    "mb": { "label": "Meeting Booked",   "color": "#3b82f6", "symbol": "wye",      "priority": 5  },
-    "ii": { "label": "Initial Interest", "color": "#fde047", "symbol": "cross",    "priority": 4  },
-    "cl": { "label": "Closed Lost",      "color": "#ef4444", "symbol": "circle",   "priority": 3  },
-    "t":  { "label": "Touched",          "color": "#38bdf8", "symbol": "circle",   "priority": 2  },
-    "u":  { "label": "Untouched",        "color": "#cbd5e1", "symbol": "circle",   "priority": 1  }
+    "cu": { "label": "Won / Customer", "color": "#fbbf24", "symbol": "star",   "priority": 5 },
+    "mf": { "label": "Mid Funnel",     "color": "#f97316", "symbol": "circle", "priority": 4 },
+    "tf": { "label": "Top Funnel",     "color": "#3b82f6", "symbol": "circle", "priority": 3 },
+    "cl": { "label": "Closed Lost",    "color": "#ef4444", "symbol": "circle", "priority": 3 },
+    "t":  { "label": "Touched",        "color": "#38bdf8", "symbol": "circle", "priority": 2 },
+    "u":  { "label": "Untouched",      "color": "#94a3b8", "symbol": "circle", "priority": 1 }
   },
-  "statusGroups": {
-    "pipeline":     ["vb", "pr", "dm", "sq", "mb", "ii"],
-    "touched":      ["vb", "pr", "dm", "sq", "mb", "ii", "cl", "cu", "t"],
-    "pipelineFull": ["ii", "mb", "sq", "dm", "pr", "vb", "cu"]
-  },
-  "dotFilters": [
-    { "id": "all",       "label": "All"          },
-    { "id": "customers", "label": "★ Customers"  },
-    { "id": "pipeline",  "label": "◆ Pipeline"   },
-    { "id": "touched",   "label": "● Touched",   "showTip": true },
-    { "id": "untouched", "label": "○ Untouched", "showTip": true }
-  ],
   "roster": [
     "Catherine Silvestri", "Nick Martino", "Ali Cohen", "Ryan Minter",
     "Alicia Gopal", "Lucy Nemerov", "Hugh Bargeron", "Sydney Ireland",
-    "Emily Murnane", "Ben Laddis", "Blake Anderson", "Mihir Shah", "Maia Golub"
-  ]
+    "Ben Laddis", "Blake Anderson", "Mihir Shah", "Maia Golub"
+  ],
+  "pods": {
+    "GovPod": {
+      "color": "#a855f7",
+      "lead": "Ali Cohen",
+      "members": ["Ali Cohen", "Catherine Silvestri", "Hugh Bargeron", "Lucy Nemerov", "Mihir Shah", "Nick Martino"]
+    },
+    "PodWell": {
+      "color": "#06b6d4",
+      "lead": "Ryan Minter",
+      "members": ["Ryan Minter", "Ben Laddis", "Blake Anderson", "Maia Golub", "Alicia Gopal", "Sydney Ireland"]
+    }
+  },
+  "ownerColors": {
+    "Ali Cohen":          "#f43f5e",
+    "Catherine Silvestri":"#2dd4bf",
+    "Hugh Bargeron":      "#60a5fa",
+    "Lucy Nemerov":       "#a78bfa",
+    "Mihir Shah":         "#fb7185",
+    "Nick Martino":       "#34d399",
+    "Ryan Minter":        "#818cf8",
+    "Ben Laddis":         "#facc15",
+    "Blake Anderson":     "#4ade80",
+    "Maia Golub":         "#e879f9",
+    "Alicia Gopal":       "#fb923c",
+    "Sydney Ireland":     "#f59e0b"
+  }
 }
